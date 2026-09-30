@@ -205,11 +205,14 @@ def main(argv=None):
     except (OSError, ValueError, KeyError, TypeError) as exc:
         parser.error(str(exc))
     print(shlex.join(command), flush=True)
-    print(f'Report: {output / "report.html"}', flush=True)
+    inspection = args.command == 'dataset' and args.inspect
+    if inspection:
+        print('Inspection only: no output directory or report will be created.', flush=True)
+    else:
+        print(f'Report: {output / "report.html"}', flush=True)
     if args.dry_run:
         return 0
-    inspection = args.command == 'dataset' and args.inspect
-    if args.command == 'dataset':
+    if args.command == 'dataset' and not inspection:
         # Validate annotations, split, paths and actual images before checking
         # CUDA or optional AU-scoring dependencies.
         try:

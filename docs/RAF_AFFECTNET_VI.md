@@ -60,7 +60,8 @@ python run_magicface.py dataset /data/RAF-DB --dataset-type rafdb \
 
 Bạn cũng có thể truyền thẳng một thư mục ảnh nằm dưới `basic/Image/`, ví dụ
 `basic/Image/aligned_224`. CLI sẽ tìm ngược lên `basic/EmoLabel/` và nhận đây là
-ảnh aligned nhờ tên thư mục:
+ảnh aligned nhờ tên thư mục. Cả hai quy ước tên file đều được hỗ trợ:
+`test_0001_aligned.jpg` và `test_0001.jpg`.
 
 ```bash
 python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 \

@@ -104,6 +104,18 @@ class CliTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(main(['preview', '--output', str(self.directory / 'out')]), 7)
 
+    def test_dataset_inspect_does_not_run_parent_preflight_or_print_report(self):
+        dataset = ROOT / 'test_images'
+        stdout = io.StringIO()
+        with patch('run_magicface.subprocess.run', return_value=SimpleNamespace(returncode=0)) as run, \
+                patch('inference_dataset.plan_dataset') as plan, contextlib.redirect_stdout(stdout):
+            code = main(['dataset', str(dataset), '--inspect'])
+        self.assertEqual(code, 0)
+        plan.assert_not_called()
+        self.assertEqual(run.call_count, 1)
+        self.assertIn('Inspection only', stdout.getvalue())
+        self.assertNotIn('Report:', stdout.getvalue())
+
 
 if __name__ == '__main__':
     unittest.main()

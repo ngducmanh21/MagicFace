@@ -97,6 +97,26 @@ class NativeDatasetTests(unittest.TestCase):
         self.assertEqual(dataset['metadata']['image_version'], 'aligned')
         self.assertEqual(dataset['items'][0]['source'], str(aligned_224 / 'test_0001_aligned.jpg'))
 
+    def test_raf_aligned_224_accepts_unsuffixed_resized_files(self):
+        root, _ = self.raf()
+        aligned_224 = root / 'Image/aligned_224'
+        aligned_224.mkdir()
+        for label in RAF_LABELS:
+            self.image(aligned_224 / f'train_{label:05d}.jpg')
+        self.image(aligned_224 / 'test_0001.jpg')
+        dataset = discover_dataset(aligned_224, dataset_type='rafdb', split='test')
+        self.assertEqual(dataset['items'][0]['source'], str(aligned_224 / 'test_0001.jpg'))
+        self.assertEqual(dataset['items'][0]['metadata']['image_naming'], 'plain')
+
+    def test_raf_prefers_aligned_suffix_when_both_conventions_exist(self):
+        root, _ = self.raf()
+        aligned = root / 'Image/aligned'
+        # Official suffixed image already exists; add a resized/renamed alternative.
+        self.image(aligned / 'test_0001.jpg')
+        dataset = discover_dataset(root, dataset_type='rafdb', split='test', raf_images='aligned')
+        self.assertEqual(dataset['items'][0]['source'], str(aligned / 'test_0001_aligned.jpg'))
+        self.assertEqual(dataset['items'][0]['metadata']['image_naming'], 'aligned_suffix')
+
     def test_raf_aligned_224_is_auto_detected_from_ancestor_labels(self):
         root, _ = self.raf()
         aligned_224 = root / 'Image/aligned_224'

@@ -136,6 +136,30 @@ def _finish(path, kind, items, excluded, metadata, split):
             'metadata': {**metadata, 'requested_split': split, 'excluded_annotation_count': len(excluded)}}
 
 
+def _raf_image(images, filename, version):
+    """Resolve both official `_aligned` and common resized unsuffixed layouts."""
+    relative = Path(filename)
+    plain_stem = relative.stem[:-len('_aligned')] if relative.stem.endswith('_aligned') else relative.stem
+    stems = [plain_stem + '_aligned', plain_stem] if version == 'aligned' else [plain_stem, plain_stem + '_aligned']
+    candidates = []
+    for stem in stems:
+        for suffix in (relative.suffix.lower(), *IMAGE_EXTENSIONS):
+            candidate = images / relative.parent / (stem + suffix)
+            if candidate.is_file() and candidate not in candidates:
+                candidates.append(candidate)
+    if not candidates:
+        # Preserve the most likely path so input validation reports a concrete filename.
+        return images / relative.parent / (stems[0] + relative.suffix), 'missing'
+    # Prefer the naming convention matching --raf-images; record ambiguity instead
+    # of silently duplicating one annotation into multiple samples.
+    preferred = [candidate for candidate in candidates if candidate.stem == stems[0]]
+    if len(preferred) == 1:
+        return preferred[0], 'aligned_suffix' if preferred[0].stem.endswith('_aligned') else 'plain'
+    if len(candidates) == 1:
+        return candidates[0], 'aligned_suffix' if candidates[0].stem.endswith('_aligned') else 'plain'
+    raise ValueError(f'Multiple RAF images match {filename}: {candidates}. Pass a clean --image-root.')
+
+
 def read_rafdb(path, split='all', annotations=None, image_root=None, image_version='auto'):
     path = Path(path).resolve()
     inferred_root, inferred_files = _raf_context(path)
@@ -176,10 +200,10 @@ def read_rafdb(path, split='all', annotations=None, image_root=None, image_versi
         relative = Path(filename)
         if relative.is_absolute() or '..' in relative.parts:
             raise ValueError(f'Unexpected RAF-DB filename: {filename}')
-        if version == 'aligned' and not relative.stem.endswith('_aligned'):
-            relative = relative.with_name(relative.stem + '_aligned' + relative.suffix)
-        items.append(_item('rafdb', images / relative, label, sample_split, label_id, annotation_file,
-                           sample_key=filename, image_version=version, annotation_line=line_number))
+        source, naming = _raf_image(images, filename, version)
+        items.append(_item('rafdb', source, label, sample_split, label_id, annotation_file,
+                           sample_key=filename, image_version=version, image_naming=naming,
+                           annotation_line=line_number))
     return _finish(path, 'rafdb', items, [], {'label_mapping': RAF_LABELS, 'image_root': str(images),
                    'image_version': version, 'annotation_files': [str(annotation_file)]}, split)
 
