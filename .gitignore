@@ -4,3 +4,5 @@ runs/
 weights_libreface/
 .venv/
 .venv-au/
+models--*/
+.locks/

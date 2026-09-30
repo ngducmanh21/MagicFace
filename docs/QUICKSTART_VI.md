@@ -3,6 +3,10 @@
 File chạy chính: **`run_magicface.py`**. Config mẫu: **`configs/inference_demo.json`**.
 Tutorial này chạy **inference và đánh giá output**; project chưa có chương trình training.
 
+**Nếu muốn đưa vào một đường dẫn cho cả dataset**, dùng lệnh `dataset` theo
+[DATASET_VI.md](DATASET_VI.md). Weights lấy trực tiếp từ Hugging Face; không cần
+checkpoint tự train. Các bước dưới đây vẫn dùng được để cài môi trường.
+
 Bạn có thể làm lần lượt: xem layout không GPU → sinh ảnh → chấm AU → thêm FER nếu có nhãn.
 Các lệnh dưới đây dùng terminal Bash trên Linux/WSL, chạy tại thư mục gốc repo.
 Có hai lựa chọn tạo môi trường: Conda hoặc `uv` (các bước cài bằng pip sau đó giống nhau).

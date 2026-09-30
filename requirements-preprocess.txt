@@ -1,0 +1,8 @@
+# Optional, for datasets containing raw images without prepared backgrounds.
+-r requirements-inference.txt
+insightface==0.7.3
+onnxruntime==1.18.1
+onnx==1.16.2
+opencv-python-headless==4.10.0.84
+scipy==1.15.0
+albumentations==1.4.3

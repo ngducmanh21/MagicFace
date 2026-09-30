@@ -3,8 +3,10 @@
 
 import argparse
 from decimal import Decimal
+from datetime import datetime, timezone
 import json
 import math
+import os
 from pathlib import Path
 import shlex
 import subprocess
@@ -66,7 +68,7 @@ def build_command(args):
             raise ValueError(f'Khong tim thay file: {path}')
         output = Path(args.output).expanduser().resolve()
         options = report_options('none' if args.no_au else 'libreface',
-                                 python_path(args.au_python, Path.cwd()), args.au_device,
+                                 python_path(args.au_python or os.environ.get('MAGICFACE_AU_PYTHON'), Path.cwd()), args.au_device,
                                  args.title, args.formats, args.au_delta_scale)
         return [sys.executable, str(ROOT / 'verify_results.py'),
                 '--results_json' if args.results else '--manifest', str(path),
@@ -77,12 +79,24 @@ def build_command(args):
     if not isinstance(config, dict) or set(config) - CONFIG_KEYS:
         raise ValueError(f'Config chi ho tro cac key: {", ".join(sorted(CONFIG_KEYS))}')
     base = config_path.parent
-    image, background = (resolve_path(config[key], base) for key in ('image', 'background'))
-    for path in (image, background):
-        if not path.is_file():
-            raise ValueError(f'Khong tim thay anh: {path}')
+    is_dataset = args.command == 'dataset'
+    if is_dataset:
+        dataset = Path(args.path).expanduser().resolve()
+        if not dataset.exists():
+            raise ValueError(f'Khong tim thay dataset: {dataset}')
+        if args.limit < 0:
+            raise ValueError('--limit phai >= 0.')
+        default_output = ROOT / 'runs' / (dataset.stem + '_' + datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f'))
+    else:
+        image, background = (resolve_path(config[key], base) for key in ('image', 'background'))
+        for path in (image, background):
+            if not path.is_file():
+                raise ValueError(f'Khong tim thay anh: {path}')
+        default_output = None
     output = (Path(args.output).expanduser().resolve() if args.output
-              else resolve_path(config['output_dir'], base))
+              else resolve_path(config['output_dir'], base) if 'output_dir' in config else default_output)
+    if output is None:
+        raise ValueError('Can output_dir trong config hoac --output.')
     aus, variations = config['aus'], config['variations']
     if not isinstance(aus, list) or not aus or not all(isinstance(name, str) for name in aus):
         raise ValueError('aus phai la danh sach ten AU, vi du ["AU4", "AU1"].')
@@ -106,15 +120,27 @@ def build_command(args):
         raise ValueError('inference_steps phai la so nguyen duong.')
     backend = 'none' if args.no_au else config.get('au_backend', 'libreface')
     au_python = (python_path(args.au_python, Path.cwd()) if args.au_python
-                 else python_path(config.get('au_python'), base))
+                 else python_path(config['au_python'], base) if config.get('au_python')
+                 else python_path(os.environ.get('MAGICFACE_AU_PYTHON'), Path.cwd()))
     options = report_options(backend, au_python, config.get('au_device', 'cpu'),
                              config.get('title', 'MagicFace / AU review'),
                              config.get('figure_formats', ['png', 'svg', 'pdf']),
                              config.get('au_delta_scale'))
-    command = [sys.executable, str(ROOT / 'inference.py'), '--img_path', str(image),
-               '--bg_path', str(background), '--saved_path', str(output / 'generated'),
-               '--verification_dir', str(output), '--au_test', names, *changes,
-               '--seed', str(seed), '--inference_steps', str(steps), *options]
+    if is_dataset:
+        command = [sys.executable, str(ROOT / 'inference_dataset.py'), '--dataset', str(dataset),
+                   '--output_dir', str(output), '--limit', str(args.limit),
+                   '--preprocess_python', python_path(args.preprocess_python, Path.cwd())]
+        if args.inspect:
+            command.append('--inspect')
+        if args.prepared_only:
+            command.append('--prepared_only')
+        if args.preprocess_assets:
+            command += ['--preprocess_assets', str(Path(args.preprocess_assets).expanduser().resolve())]
+    else:
+        command = [sys.executable, str(ROOT / 'inference.py'), '--img_path', str(image),
+                   '--bg_path', str(background), '--saved_path', str(output / 'generated'),
+                   '--verification_dir', str(output)]
+    command += ['--au_test', names, *changes, '--seed', str(seed), '--inference_steps', str(steps), *options]
     for key, flag in (('base_model', '--pretrained_model_name_or_path'),
                       ('id_model', '--ID_unet_path'), ('denoising_model', '--denoising_unet_path')):
         if key in config:
@@ -135,6 +161,15 @@ def parse_args(argv=None):
     run = commands.add_parser('run', help='Sinh anh + report tu config JSON; can NVIDIA CUDA.')
     run.add_argument('--config', default=str(ROOT / 'configs/inference_demo.json'))
     run.add_argument('--output', help='Ghi de output_dir trong config.')
+    dataset = commands.add_parser('dataset', help='Mot path = mot dataset; chay pretrained weights va report chung.')
+    dataset.add_argument('path', help='Thu muc anh, dataset.json hoac dataset.csv.')
+    dataset.add_argument('--config', default=str(ROOT / 'configs/dataset_demo.json'))
+    dataset.add_argument('--output', help='Thu muc output moi; mac dinh tao run theo ten dataset + timestamp.')
+    dataset.add_argument('--limit', type=int, default=0, help='So anh toi da; 0 = tat ca.')
+    dataset.add_argument('--inspect', action='store_true', help='Kiem tra dataset, khong can GPU hay tai weights.')
+    dataset.add_argument('--prepared-only', action='store_true', help='Chi nhan anh da co background/pose.')
+    dataset.add_argument('--preprocess-python', help='Python da cai requirements-preprocess.txt; mac dinh Python hien tai.')
+    dataset.add_argument('--preprocess-assets', help='Thu muc assets preprocessing co san; mac dinh tai tu Hugging Face.')
     report = commands.add_parser('report', help='Xuat report tu ket qua/manifest da co.')
     source = report.add_mutually_exclusive_group(required=True)
     source.add_argument('--results', help='results.json da co scores; khong chay lai model.')
@@ -144,10 +179,10 @@ def parse_args(argv=None):
     report.add_argument('--au-delta-scale', type=float)
     report.add_argument('--title', default='MagicFace / AU and FER evidence')
     report.add_argument('--formats', nargs='+', choices=('png', 'svg', 'pdf'), default=['png', 'svg', 'pdf'])
-    for sub in (run, report):
+    for sub in (run, report, dataset):
         sub.add_argument('--au-python', help='Python executable cua moi truong LibreFace rieng.')
         sub.add_argument('--no-au', action='store_true', help='Khong cham AU moi; scores cu van duoc giu voi --results.')
-    for sub in (preview, run, report):
+    for sub in (preview, run, report, dataset):
         sub.add_argument('--dry-run', action='store_true', help='In lenh se chay; khong tai model hay tao output.')
     return parser, parser.parse_args(argv)
 
@@ -162,7 +197,8 @@ def main(argv=None):
     print(f'Report: {output / "report.html"}', flush=True)
     if args.dry_run:
         return 0
-    if args.command == 'run':
+    inspection = args.command == 'dataset' and args.inspect
+    if args.command in ('run', 'dataset') and not inspection:
         try:
             import torch
             if not torch.cuda.is_available():
@@ -171,7 +207,7 @@ def main(argv=None):
             print(f'Khong the chay inference: {exc}\nXem docs/QUICKSTART_VI.md; preview khong can GPU.', file=sys.stderr)
             return 2
     # Avoid downloading diffusion weights only to discover that scoring cannot import.
-    needs_au = args.command == 'run' or (args.command == 'report' and args.manifest)
+    needs_au = not inspection and (args.command in ('run', 'dataset') or (args.command == 'report' and args.manifest))
     if needs_au and command[command.index('--au_backend') + 1] == 'libreface':
         au_python = command[command.index('--au_python') + 1]
         try:

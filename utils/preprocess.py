@@ -22,7 +22,7 @@ app.prepare(ctx_id=0, det_size=(640, 640))
 def get_bbox(dets, crop_ratio):
     if crop_ratio > 0:
         bbox = dets[0:4]
-        bbox_size = max(bbox[2] - bbox[0], bbox[2] - bbox[0])
+        bbox_size = max(bbox[2] - bbox[0], bbox[3] - bbox[1])
         bbox_x = 0.5 * (bbox[2] + bbox[0])
         bbox_y = 0.5 * (bbox[3] + bbox[1])
         x1 = bbox_x - bbox_size * crop_ratio
@@ -46,7 +46,7 @@ def crop_one_image(args):
     if len(face_info_sor) > 1:
         print('The input image contain more than one face, we will only use the maximum face')
     face_info_sor = \
-    sorted(face_info_sor, key=lambda x: (x['bbox'][2] - x['bbox'][0]) * x['bbox'][3] - x['bbox'][1])[-1]
+    sorted(face_info_sor, key=lambda x: (x['bbox'][2] - x['bbox'][0]) * (x['bbox'][3] - x['bbox'][1]))[-1]
     dets_sor= face_info_sor['bbox']
     bbox_pst_sor = get_bbox(dets_sor, crop_ratio=0.75)
 

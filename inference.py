@@ -141,8 +141,8 @@ def tokenize_captions(tokenizer, captions, max_length):
     return inputs.input_ids
 
 
-def main(args):
-    import numpy as np
+def load_pipeline(args):
+    """Load pretrained weights once; reusable across all images in a dataset."""
     import torch
     from diffusers import AutoencoderKL, UniPCMultistepScheduler
     from transformers import CLIPTextModel, CLIPTokenizer
@@ -150,8 +150,6 @@ def main(args):
     from mgface.pipelines_mgface.unet_ID_2d_condition import UNetID2DConditionModel
     from mgface.pipelines_mgface.unet_deno_2d_condition import UNetDeno2DConditionModel
 
-    # Validate/read images before downloading model weights.
-    source, bg = make_data(args)
     device = 'cuda'
     denoising_unet_path = args.denoising_unet_path
     ID_unet_path = args.ID_unet_path
@@ -221,10 +219,19 @@ def main(args):
     pipeline.set_progress_bar_config(disable=True)
 
     prompt = 'A close up of a person.'
+    prompt_embeds = text_encoder(tokenize_captions(tokenizer, [prompt], 2).to(device))[0]
+    return pipeline, prompt_embeds
+
+
+def generate_edits(args, pipeline, prompt_embeds, images=None, on_case=None):
+    import numpy as np
+    import torch
+    from time import perf_counter
+
+    device = pipeline._execution_device
+    source, bg = images if images is not None else make_data(args)
     source = source.unsqueeze(0)
     bg = bg.unsqueeze(0)
-    
-    prompt_embeds = text_encoder(tokenize_captions(tokenizer, [prompt], 2).to(device))[0]
     saved_path = args.saved_path
     os.makedirs(saved_path, exist_ok=True)
     image_path = Path(args.img_path)
@@ -234,10 +241,12 @@ def main(args):
         generator = torch.Generator(device=device).manual_seed(args.seed) if args.seed is not None else None
         au_prompt = np.array([requested.get(name, 0.0) for name in AU_NAMES], dtype=np.float32)
         tor_exp = torch.from_numpy(au_prompt).unsqueeze(0)
+        started = perf_counter()
         sample = pipeline(
             prompt_embeds=prompt_embeds, source=source, bg=bg, au=tor_exp,
             num_inference_steps=args.inference_steps, generator=generator,
         ).images[0]
+        elapsed = perf_counter() - started
         filename = (image_path.name if len(args.au_requests) == 1
                     else f'{image_path.stem}_edit_{index + 1:03d}.png')
         result_path = Path(saved_path) / filename
@@ -247,15 +256,32 @@ def main(args):
         label = ', '.join(f'{name} {value:+g}' for name, value in requested.items())
         cases.append({'source': str(image_path.resolve()), 'result': str(result_path.resolve()),
                       'requested_aus': requested, 'label': label, 'seed': args.seed,
-                      'inference_steps': args.inference_steps})
+                      'inference_steps': args.inference_steps,
+                      'generation_seconds': elapsed, 'background': str(Path(args.bg_path).resolve())})
         print(f'Saved {label}: {result_path}')
+        if on_case is not None:
+            on_case(cases[-1], index)
+    return cases
+
+
+def model_metadata(args):
+    return {'base_model': args.pretrained_model_name_or_path, 'ID_unet': args.ID_unet_path,
+            'denoising_unet': args.denoising_unet_path, 'revision': args.revision,
+            'variant': args.variant, 'prompt': 'A close up of a person.'}
+
+
+def main(args):
+    # Validate/read images before downloading model weights.
+    images = make_data(args)
+    pipeline, prompt_embeds = load_pipeline(args)
+    cases = generate_edits(args, pipeline, prompt_embeds, images=images)
+    image_path = Path(args.img_path)
+    saved_path = args.saved_path
 
     if args.verify or args.evidence or len(cases) > 1:
         report_dir = Path(args.verification_dir or Path(saved_path) / f'{image_path.stem}_verification')
         report_dir.mkdir(parents=True, exist_ok=True)
-        metadata = {'base_model': args.pretrained_model_name_or_path, 'ID_unet': args.ID_unet_path,
-                    'denoising_unet': args.denoising_unet_path, 'revision': args.revision,
-                    'variant': args.variant, 'prompt': prompt, 'background': str(Path(args.bg_path).resolve())}
+        metadata = {**model_metadata(args), 'background': str(Path(args.bg_path).resolve())}
         # Persist before scoring, so reports can be rebuilt without generating images again.
         (report_dir / 'manifest.json').write_text(json.dumps({'cases': cases, 'metadata': metadata}, indent=2))
         report_from_args(cases, report_dir, args, metadata=metadata)

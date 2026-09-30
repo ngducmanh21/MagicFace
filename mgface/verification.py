@@ -16,6 +16,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 from .au import AU_NAMES, validate_request
 from .evidence import validate_fer_annotations
 
+CASE_METADATA_FIELDS = ('label', 'requested_aus', 'seed', 'inference_steps', 'fer',
+                        'sample_id', 'dataset_id', 'input_source', 'dataset_metadata',
+                        'background', 'generation_seconds')
+
 
 def add_report_arguments(parser):
     parser.add_argument('--au_backend', choices=('libreface', 'none'), default='libreface',
@@ -200,6 +204,16 @@ def _write_html(report, output_dir):
     calibration = ('Request values are model controls. Their conversion to measured intensity is not configured; expected change and error are N/A.'
                    if scale is None else f'Expected change = request × {scale:g}. Error is absolute measured-minus-expected change. Targets are not clipped.')
     links = ' '.join(f'<a href="{name}">Grid {i + 1}</a>' for i, name in enumerate(report['grids']))
+    dataset_html = ''
+    dataset_counts = report['metadata'].get('dataset_counts')
+    if isinstance(dataset_counts, dict):
+        dataset_html = (f'<p><b>Dataset coverage:</b> {esc(dataset_counts.get("selected_images", "N/A"))} selected inputs; '
+                        f'{esc(dataset_counts.get("images_with_output", "N/A"))} images with output; '
+                        f'{esc(dataset_counts.get("generated_edits", "N/A"))} generated edits; '
+                        f'{esc(dataset_counts.get("failed_events", "N/A"))} input/preprocessing/generation failure events.</p>')
+    for name in ('dataset_summary.json', 'samples.csv', 'failures.csv'):
+        if (output_dir / name).is_file():
+            links += f' <a href="{name}">{name}</a>'
     evidence_html = ''
     if 'evidence' in report:
         evidence = report['evidence']
@@ -246,6 +260,7 @@ figure{margin:0}img{width:100%;aspect-ratio:1;object-fit:contain;background:#edf
     document += f'''<p class="muted">MAGICFACE / RESULT REVIEW</p><h1>{esc(report['title'])}</h1>
 <p>{len(report['cases'])} results · {report['scored_cases']} scored · {len(report['cases']) - report['scored_cases']} unscored<br>
 Estimator: {esc(report['estimator'])} {esc(report.get('estimator_version') or '')} · Intensity scale: 0–5</p>
+{dataset_html}
 <p>Change = result intensity − source intensity. Highlighted rows are requested non-zero edits.<br>{esc(calibration)}<br>
 Unchanged AU drift is the mean absolute change of AUs requested at zero. * Expected absolute intensity outside 0–5. AU estimates are not ground truth.</p>
 <nav><a href="scores.csv">Download CSV</a><a href="results.json">Results JSON</a><a href="manifest.json">Manifest</a>{links}</nav>
@@ -300,12 +315,13 @@ def write_verification_report(cases, output_dir, scores=None, au_delta_scale=Non
     if evidence:
         from .evidence import write_evidence
         report['evidence'] = write_evidence(report, output_dir, formats=figure_formats)
-    portable_cases = [{**{key: case[key] for key in ('label', 'requested_aus', 'seed', 'inference_steps', 'fer') if key in case},
+    portable_cases = [{**{key: case[key] for key in CASE_METADATA_FIELDS if key in case},
                        'source': case['source_asset'], 'result': case['result_asset']} for case in report['cases']]
     (output_dir / 'manifest.json').write_text(json.dumps({'cases': portable_cases, 'metadata': report['metadata']},
                                                        indent=2, ensure_ascii=False), encoding='utf-8')
     (output_dir / 'results.json').write_text(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
-    fields = ['case', 'label', 'source', 'result', 'seed', 'inference_steps', 'status', 'au',
+    fields = ['case', 'sample_id', 'dataset_id', 'label', 'source', 'result', 'seed', 'inference_steps',
+              'generation_seconds', 'status', 'au',
               'requested_delta', 'source_intensity', 'result_intensity', 'measured_delta',
               'expected_delta', 'absolute_error', 'target_out_of_range', 'edited_au_mae', 'unchanged_au_drift']
     with (output_dir / 'scores.csv').open('w', newline='', encoding='utf-8') as stream:
@@ -316,8 +332,8 @@ def write_verification_report(cases, output_dir, scores=None, au_delta_scale=Non
                 entry = {key: case.get(key) for key in fields if key in case}
                 entry.update(row, case=i + 1)
                 # Prevent spreadsheet programs interpreting labels or paths as formulas.
-                for key in ('label', 'source', 'result'):
-                    if isinstance(entry[key], str) and entry[key].startswith(('=', '+', '-', '@')):
+                for key in ('sample_id', 'dataset_id', 'label', 'source', 'result'):
+                    if isinstance(entry.get(key), str) and entry[key].startswith(('=', '+', '-', '@')):
                         entry[key] = "'" + entry[key]
                 writer.writerow(entry)
     _write_html(report, output_dir)

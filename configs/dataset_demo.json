@@ -1,0 +1,15 @@
+{
+  "aus": ["AU4", "AU1"],
+  "variations": [[0, 0], [2, 1], [4, 2]],
+  "seed": 424,
+  "inference_steps": 50,
+  "title": "MagicFace / dataset review / AU4 + AU1",
+  "au_backend": "libreface",
+  "au_python": null,
+  "au_device": "cpu",
+  "au_delta_scale": null,
+  "figure_formats": ["png", "svg", "pdf"],
+  "base_model": "sd-legacy/stable-diffusion-v1-5",
+  "id_model": "mengtingwei/magicface",
+  "denoising_model": "mengtingwei/magicface"
+}

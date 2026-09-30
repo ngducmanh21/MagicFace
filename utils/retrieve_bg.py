@@ -135,7 +135,7 @@ def get_landmarks(image):
     face_info = app.get(cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR))
     if len(face_info) == 0:
         return 'error'
-    face_info = sorted(face_info, key=lambda x: (x['bbox'][2] - x['bbox'][0]) * x['bbox'][3] - x['bbox'][1])[-1]  # only use the maximum face
+    face_info = sorted(face_info, key=lambda x: (x['bbox'][2] - x['bbox'][0]) * (x['bbox'][3] - x['bbox'][1]))[-1]  # only use the maximum face
     pts5 = face_info['kps']
 
     warp_mat = datasets_faceswap.get_affine_transform(pts5, datasets_faceswap.mean_face_lm5p_256)

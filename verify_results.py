@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from mgface.verification import add_report_arguments, report_from_args, write_verification_report
+from mgface.verification import CASE_METADATA_FIELDS, add_report_arguments, report_from_args, write_verification_report
 
 
 def load_saved_results(path):
@@ -15,7 +15,7 @@ def load_saved_results(path):
     scores = {'estimator': report['estimator'], 'version': report.get('estimator_version'),
               'device': report.get('estimator_device'), 'images': {}}
     for item in report['cases']:
-        case = {key: item[key] for key in ('label', 'requested_aus', 'seed', 'inference_steps', 'fer') if key in item}
+        case = {key: item[key] for key in CASE_METADATA_FIELDS if key in item}
         for role in ('source', 'result'):
             case[role] = str((path.parent / item[f'{role}_asset']).resolve())
             score = item[f'{role}_score']

@@ -1,0 +1,8 @@
+{
+  "metadata": {"description": "Prepared example inputs supplied with MagicFace; no FER labels assumed."},
+  "items": [
+    {"id": "00381", "source": "../test_images/00381.png", "background": "../test_images/00381_bg.png"},
+    {"id": "00025", "source": "../test_images/00025.png", "background": "../test_images/00025_bg.png"},
+    {"id": "00512", "source": "../test_images/00512.png", "background": "../test_images/00512_bg.png"}
+  ]
+}
