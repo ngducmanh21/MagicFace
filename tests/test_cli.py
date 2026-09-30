@@ -74,6 +74,17 @@ class CliTests(unittest.TestCase):
         self.assertEqual(run.call_count, 1)
         self.assertEqual(run.call_args.args[0], ['/missing/python', '-c', 'import libreface'])
 
+    def test_missing_au_message_offers_generation_without_scores(self):
+        fake_torch = SimpleNamespace(cuda=SimpleNamespace(is_available=lambda: True))
+        stderr = io.StringIO()
+        with patch.dict(sys.modules, {'torch': fake_torch}), \
+                patch('run_magicface.subprocess.run', side_effect=FileNotFoundError('missing AU Python')), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(stderr):
+            code = main(['run', '--config', str(self.path), '--au-python', '/missing/python'])
+        self.assertEqual(code, 2)
+        self.assertIn('--no-au', stderr.getvalue())
+        self.assertIn('Generation chua bat dau', stderr.getvalue())
+
     def test_preview_and_cached_report_work_outside_repo_without_gpu(self):
         output = self.directory / 'preview'
         command = [sys.executable, str(ROOT / 'run_magicface.py')]

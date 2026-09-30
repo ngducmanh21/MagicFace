@@ -84,6 +84,29 @@ class NativeDatasetTests(unittest.TestCase):
         self.assertEqual(original['items'][0]['source'], str(root / 'Image/original/test_0001.jpg'))
         self.assertEqual(original['items'][0]['fer']['source_true'], 'happy')
 
+    def test_raf_aligned_224_path_finds_labels_in_ancestor(self):
+        root, _ = self.raf()
+        aligned_224 = root / 'Image/aligned_224'
+        aligned_224.mkdir()
+        for label in RAF_LABELS:
+            self.image(aligned_224 / f'train_{label:05d}_aligned.jpg')
+        self.image(aligned_224 / 'test_0001_aligned.jpg')
+        dataset = discover_dataset(aligned_224, dataset_type='rafdb', split='test')
+        self.assertEqual(dataset['kind'], 'rafdb')
+        self.assertEqual(dataset['metadata']['image_root'], str(aligned_224))
+        self.assertEqual(dataset['metadata']['image_version'], 'aligned')
+        self.assertEqual(dataset['items'][0]['source'], str(aligned_224 / 'test_0001_aligned.jpg'))
+
+    def test_raf_aligned_224_is_auto_detected_from_ancestor_labels(self):
+        root, _ = self.raf()
+        aligned_224 = root / 'Image/aligned_224'
+        aligned_224.mkdir()
+        for label in RAF_LABELS:
+            self.image(aligned_224 / f'train_{label:05d}_aligned.jpg')
+        self.image(aligned_224 / 'test_0001_aligned.jpg')
+        dataset = discover_dataset(aligned_224, split='test')
+        self.assertEqual(dataset['kind'], 'rafdb')
+
     def test_raf_zero_based_labels_fail_instead_of_being_remapped(self):
         root, labels = self.raf()
         labels.write_text('train_00001.jpg 0')

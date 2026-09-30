@@ -209,6 +209,22 @@ def main(argv=None):
     if args.dry_run:
         return 0
     inspection = args.command == 'dataset' and args.inspect
+    if args.command == 'dataset':
+        # Validate annotations, split, paths and actual images before checking
+        # CUDA or optional AU-scoring dependencies.
+        try:
+            from inference_dataset import parse_args as parse_dataset_args, plan_dataset
+            dataset_args = parse_dataset_args(command[2:])
+            dataset, selected, ready, raw, errors = plan_dataset(dataset_args)
+            print(f"Dataset preflight: type={dataset['kind']}, selected={len(selected)}, "
+                  f"prepared={len(ready)}, preprocess={len(raw)}, invalid={len(errors)}", flush=True)
+            for error in errors[:5]:
+                print(f"  invalid {error['dataset_id']}: {error['error']}", file=sys.stderr)
+        except (ImportError, OSError, ValueError, SystemExit) as exc:
+            print(f'Dataset khong hop le: {exc}\n'
+                  'RAF-DB: truyen root basic/, hoac truyen --annotations va --image-root.\n'
+                  'Neu thieu package, hay chay CLI trong moi truong MagicFace da cai requirements.', file=sys.stderr)
+            return 2
     if args.command in ('run', 'dataset') and not inspection:
         try:
             import torch
@@ -225,7 +241,11 @@ def main(argv=None):
             subprocess.run([au_python, '-c', 'import libreface'], cwd=ROOT, check=True)
         except (OSError, subprocess.CalledProcessError) as exc:
             print(f'Khong import duoc LibreFace voi {au_python}: {exc}\n'
-                  'Cai requirements-au.txt hoac dung --no-au de chay anh truoc.', file=sys.stderr)
+                  'Generation chua bat dau. Chon mot trong hai cach:\n'
+                  '  1) Them --no-au de sinh anh/report truoc (AU se la N/A).\n'
+                  '  2) Tao moi truong AU rieng, roi truyen --au-python /path/to/python.\n'
+                  '     uv venv --python 3.9 --seed .venv-au\n'
+                  '     .venv-au/bin/python -m pip install -r requirements-au.txt', file=sys.stderr)
             return 2
     try:
         return subprocess.run(command, cwd=ROOT, check=False).returncode

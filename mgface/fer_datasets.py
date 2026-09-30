@@ -56,6 +56,26 @@ def _raf_annotations(root):
             if (base / 'EmoLabel' / name).is_file()]
 
 
+def _raf_context(path):
+    """Find RAF Basic labels when the user passes root, Image/, or aligned_* directly."""
+    start = path if path.is_dir() else path.parent
+    candidates = []
+    for depth, directory in enumerate((start, *start.parents)):
+        candidates.extend(_raf_annotations(directory))
+        # RAF layouts are shallow; stop before walking unrelated parent trees.
+        if depth >= 6:
+            break
+    files = list(dict.fromkeys(candidate.resolve() for candidate in candidates))
+    if len(files) > 1:
+        raise ValueError('Multiple RAF-DB label files found above the supplied path. '
+                         'Pass --annotations explicitly.')
+    if not files:
+        return None, []
+    annotation = files[0]
+    root = annotation.parent.parent
+    return root, files
+
+
 def _affect_csvs(root):
     return [base / folder / name for base in (root, root / 'Manually_Annotated')
             for folder in ('', 'file_lists', 'Manually_Annotated_file_lists')
@@ -85,7 +105,8 @@ def detect_dataset_type(path):
     # User-written manifests take precedence over automatic native detection.
     if any((path / name).is_file() for name in ('dataset.json', 'dataset.csv')):
         return 'generic'
-    raf = bool(_raf_annotations(path))
+    _, raf_files = _raf_context(path)
+    raf = bool(raf_files)
     affect = bool(_affect_csvs(path) or _npy_roots(path))
     if raf and affect:
         raise ValueError('Both RAF-DB and AffectNet annotations found. Pass a specific dataset root.')
@@ -117,17 +138,23 @@ def _finish(path, kind, items, excluded, metadata, split):
 
 def read_rafdb(path, split='all', annotations=None, image_root=None, image_version='auto'):
     path = Path(path).resolve()
-    files = [Path(annotations).resolve()] if annotations else ([path] if path.is_file() else _raf_annotations(path))
+    inferred_root, inferred_files = _raf_context(path)
+    files = [Path(annotations).resolve()] if annotations else ([path] if path.is_file() else inferred_files)
     if len(files) != 1:
         raise ValueError('RAF-DB needs one EmoLabel/list_patition_label.txt. '
-                         'Pass the basic dataset root or --annotations explicitly.')
+                         'Pass the Basic root, or add --annotations and --image-root explicitly. '
+                         f'Supplied path: {path}')
     annotation_file = files[0]
     root = annotation_file.parent.parent if annotation_file.parent.name.lower() == 'emolabel' else (
-        path if path.is_dir() else path.parent)
+        inferred_root or (path if path.is_dir() else path.parent))
     version = image_version
     if version == 'auto':
-        version = 'aligned' if (root / 'Image/aligned').is_dir() else 'original'
-    images = Path(image_root).resolve() if image_root else root / 'Image' / version
+        version = ('aligned' if 'aligned' in path.name.lower() or (root / 'Image/aligned').is_dir()
+                   else 'original')
+    supplied_image_dir = (path.is_dir() and path not in (root, root / 'Image')
+                          and (root / 'Image') in path.parents)
+    images = (Path(image_root).resolve() if image_root else path if supplied_image_dir
+              else root / 'Image' / version)
     if not images.is_dir():
         raise ValueError(f'RAF-DB image directory missing: {images}. Use --image-root / --raf-images.')
     items = []

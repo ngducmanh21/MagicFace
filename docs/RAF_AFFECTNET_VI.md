@@ -58,6 +58,39 @@ python run_magicface.py dataset /data/RAF-DB --dataset-type rafdb \
   --raf-images original --split test --limit 8 --output runs/rafdb_original_8
 ```
 
+Bạn cũng có thể truyền thẳng một thư mục ảnh nằm dưới `basic/Image/`, ví dụ
+`basic/Image/aligned_224`. CLI sẽ tìm ngược lên `basic/EmoLabel/` và nhận đây là
+ảnh aligned nhờ tên thư mục:
+
+```bash
+python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 \
+  --dataset-type rafdb --split test --limit 8 --no-au \
+  --output runs/rafdb_test_8
+```
+
+Ảnh 224×224 chưa phải input chuẩn 512×512 có background/pose, nên vẫn cần
+`requirements-preprocess.txt`. `--no-au` chỉ bỏ bước LibreFace sau generation;
+không bỏ preprocessing MagicFace.
+
+Nếu thấy `ModuleNotFoundError: libreface`, có hai cách:
+
+```bash
+# Cách nhanh: sinh ảnh trước, chưa đo AU
+python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 \
+  --dataset-type rafdb --split test --limit 8 --no-au \
+  --output runs/rafdb_test_8
+
+# Hoặc cài môi trường chấm AU riêng
+uv venv --python 3.9 --seed .venv-au
+.venv-au/bin/python -m pip install -r requirements-au.txt
+python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 \
+  --dataset-type rafdb --split test --limit 8 \
+  --au-python "$PWD/.venv-au/bin/python" --output runs/rafdb_test_8_scored
+```
+
+Không nên chạy MagicFace bằng `.venv` của một project FER khác nếu môi trường đó
+chưa cài `requirements-inference.txt` và `requirements-preprocess.txt`.
+
 Nếu annotation/ảnh đặt ở chỗ khác:
 
 ```bash
