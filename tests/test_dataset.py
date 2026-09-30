@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -237,6 +238,17 @@ class DatasetTests(unittest.TestCase):
         Image.new('RGB', (224, 200)).save(source)
         with self.assertRaisesRegex(ValueError, 'must be square'):
             prepare_aligned_source(source, self.root / 'source.png')
+
+    def test_aligned_landmark_template_scales_from_256_to_512(self):
+        module = ast.parse((ROOT / 'utils/retrieve_bg.py').read_text())
+        function = next(node for node in module.body if isinstance(node, ast.FunctionDef)
+                        and node.name == 'aligned_face_landmarks5')
+        template = np.array([[10, 20], [30, 40]], dtype=np.float32)
+        namespace = {'np': np, 'datasets_faceswap': SimpleNamespace(mean_face_lm5p_256=template)}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), 'aligned_face_landmarks5', 'exec'), namespace)
+        np.testing.assert_allclose(namespace['aligned_face_landmarks5']((512, 512)), template * 2)
+        with self.assertRaisesRegex(ValueError, 'must be square'):
+            namespace['aligned_face_landmarks5']((512, 480))
 
 
 if __name__ == '__main__':

@@ -76,6 +76,9 @@ không bỏ preprocessing MagicFace.
 Với metadata RAF aligned, preprocessing giữ nguyên crop khuôn mặt và chỉ resize
 224→512 trước khi tạo background/pose. Nó không gọi detector để crop lần hai;
 điều này tránh lỗi `The input image must contain a face` trên các crop sát mặt.
+Việc tạo pose dùng tọa độ 5 landmark chuẩn của RAF-aligned, nên cũng không gọi
+InsightFace landmark detector cho loại input này. D3DFR vẫn ước lượng contour
+từ chính ảnh đã resize; đây là đường xử lý dành riêng cho crop aligned.
 
 Nếu thấy `ModuleNotFoundError: libreface`, có hai cách:
 

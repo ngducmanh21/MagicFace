@@ -8,7 +8,6 @@ import numpy as np
 import torch
 import torchvision.transforms as transforms
 from PIL import Image
-from insightface.app import FaceAnalysis
 
 import data.datasets_faceswap as datasets_faceswap
 import third_party.d3dfr.bfm as bfm
@@ -20,10 +19,18 @@ from torchvision.utils import save_image
 
 device = 'cuda'
 checkpoint = './checkpoints'
-app = FaceAnalysis(name='antelopev2', root=os.path.join('./',
-                                                        'third_party_files'),
-                       providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
-app.prepare(ctx_id=0, det_size=(640, 640))
+app = None
+
+
+def get_face_app():
+    """Load InsightFace only for unaligned/raw inputs."""
+    global app
+    if app is None:
+        from insightface.app import FaceAnalysis
+        app = FaceAnalysis(name='antelopev2', root=os.path.join('./', 'third_party_files'),
+                           providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        app.prepare(ctx_id=0, det_size=(640, 640))
+    return app
 
 
 n_classes = 19
@@ -131,12 +138,23 @@ def keep_background(im, parsing_anno, stride):
 
 
 
-def get_landmarks(image):
-    face_info = app.get(cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR))
-    if len(face_info) == 0:
-        return 'error'
-    face_info = sorted(face_info, key=lambda x: (x['bbox'][2] - x['bbox'][0]) * (x['bbox'][3] - x['bbox'][1]))[-1]  # only use the maximum face
-    pts5 = face_info['kps']
+def aligned_face_landmarks5(image_size):
+    """RAF aligned crops use the same canonical geometry at any square resolution."""
+    width, height = image_size
+    if width != height:
+        raise ValueError(f'Aligned face image must be square, got {image_size}')
+    return datasets_faceswap.mean_face_lm5p_256 * np.array([width / 256, height / 256], dtype=np.float32)
+
+
+def get_landmarks(image, assume_aligned=False):
+    if assume_aligned:
+        pts5 = aligned_face_landmarks5(image.size)
+    else:
+        face_info = get_face_app().get(cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR))
+        if len(face_info) == 0:
+            return 'error'
+        face_info = sorted(face_info, key=lambda x: (x['bbox'][2] - x['bbox'][0]) * (x['bbox'][3] - x['bbox'][1]))[-1]  # only use the maximum face
+        pts5 = face_info['kps']
 
     warp_mat = datasets_faceswap.get_affine_transform(pts5, datasets_faceswap.mean_face_lm5p_256)
     drive_im_crop256 = cv2.warpAffine(np.array(image), warp_mat, (256, 256), flags=cv2.INTER_LINEAR)
@@ -170,7 +188,7 @@ def make_bg_for_one_image(args):
         img = img.cuda()
         out = net(img)[0]  # [1, 19, 512, 512]
         parsing = out.squeeze(0).cpu().numpy().argmax(0)
-        landmarks = get_landmarks(image)
+        landmarks = get_landmarks(image, assume_aligned=getattr(args, 'assume_aligned', False))
         if isinstance(landmarks, str):
             raise RuntimeError('Cannot detect face landmarks for background/pose generation')
         im_pts70 = landmarks[0]

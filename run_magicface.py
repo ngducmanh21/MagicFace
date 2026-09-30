@@ -235,8 +235,12 @@ def main(argv=None):
                 print(f"  invalid {error['dataset_id']}: {error['error']}", file=sys.stderr)
             if raw:
                 try:
-                    check_python_imports(dataset_args.preprocess_python,
-                                         ('torch', 'torchvision', 'cv2', 'scipy', 'onnxruntime', 'insightface'))
+                    modules = ['torch', 'torchvision', 'cv2', 'scipy']
+                    if any(not (item.get('metadata', {}).get('dataset_name') == 'rafdb'
+                               and item.get('metadata', {}).get('image_version') == 'aligned')
+                           for item in raw):
+                        modules += ['onnxruntime', 'insightface']
+                    check_python_imports(dataset_args.preprocess_python, modules)
                 except (OSError, RuntimeError) as exc:
                     print(f'Moi truong preprocessing chua san sang: {exc}\n'
                           f'Python dang dung: {dataset_args.preprocess_python}\n'

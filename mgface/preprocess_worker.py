@@ -56,7 +56,8 @@ def prepare(items, output, assets):
                     with Image.open(item['source']) as image:
                         ImageOps.exif_transpose(image).convert('RGB').save(normalized)
                     preprocess.crop_one_image(SimpleNamespace(img_path=str(normalized), save_path=str(source)))
-            retrieve_bg.make_bg_for_one_image(SimpleNamespace(img_path=str(source), save_path=str(background)))
+            retrieve_bg.make_bg_for_one_image(SimpleNamespace(
+                img_path=str(source), save_path=str(background), assume_aligned=aligned_input(item)))
             for path in (source, background):
                 with Image.open(path) as image:
                     image.load()
