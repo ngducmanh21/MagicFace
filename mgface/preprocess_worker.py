@@ -12,6 +12,22 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def aligned_input(item):
+    """RAF aligned crops already encode face location; detecting/cropping again is harmful."""
+    metadata = item.get('metadata') or {}
+    return metadata.get('dataset_name') == 'rafdb' and metadata.get('image_version') == 'aligned'
+
+
+def prepare_aligned_source(input_path, output_path):
+    from PIL import Image, ImageOps
+
+    with Image.open(input_path) as image:
+        image = ImageOps.exif_transpose(image).convert('RGB')
+        if image.width != image.height:
+            raise ValueError(f'RAF aligned input must be square, got {image.size}')
+        image.resize((512, 512), Image.Resampling.LANCZOS).save(output_path)
+
+
 def prepare(items, output, assets):
     from PIL import Image, ImageOps
 
@@ -19,8 +35,11 @@ def prepare(items, output, assets):
     os.chdir(assets)
     sys.path.insert(0, str(ROOT / 'utils'))
     sys.path.insert(0, str(assets))
-    import preprocess
     import retrieve_bg
+    preprocess = None
+    if any(not aligned_input(item) for item in items):
+        import preprocess as preprocess_module
+        preprocess = preprocess_module
 
     results = {}
     for index, item in enumerate(items):
@@ -29,11 +48,14 @@ def prepare(items, output, assets):
         directory.mkdir(parents=True, exist_ok=True)
         source, background = directory / 'source.png', directory / 'background.png'
         try:
-            with tempfile.TemporaryDirectory(prefix='magicface-input-') as temp:
-                normalized = Path(temp) / 'input.png'
-                with Image.open(item['source']) as image:
-                    ImageOps.exif_transpose(image).convert('RGB').save(normalized)
-                preprocess.crop_one_image(SimpleNamespace(img_path=str(normalized), save_path=str(source)))
+            if aligned_input(item):
+                prepare_aligned_source(item['source'], source)
+            else:
+                with tempfile.TemporaryDirectory(prefix='magicface-input-') as temp:
+                    normalized = Path(temp) / 'input.png'
+                    with Image.open(item['source']) as image:
+                        ImageOps.exif_transpose(image).convert('RGB').save(normalized)
+                    preprocess.crop_one_image(SimpleNamespace(img_path=str(normalized), save_path=str(source)))
             retrieve_bg.make_bg_for_one_image(SimpleNamespace(img_path=str(source), save_path=str(background)))
             for path in (source, background):
                 with Image.open(path) as image:
@@ -43,6 +65,7 @@ def prepare(items, output, assets):
             results[item['id']] = {'status': 'ok', 'source': str(source), 'background': str(background)}
         except Exception as exc:
             results[item['id']] = {'status': 'error', 'error': f'{type(exc).__name__}: {exc}'}
+            print(f'Failed {item["id"]}: {results[item["id"]]["error"]}', file=sys.stderr, flush=True)
     return results
 
 

@@ -170,18 +170,17 @@ def make_bg_for_one_image(args):
         img = img.cuda()
         out = net(img)[0]  # [1, 19, 512, 512]
         parsing = out.squeeze(0).cpu().numpy().argmax(0)
-        im_pts70 = get_landmarks(image)[0]
-        if isinstance(im_pts70, str):
-            print('cannot find face')
-            return
-        else:
-            im_pts70 = torch.clamp((im_pts70 + 1) / 2, min=0, max=1)
+        landmarks = get_landmarks(image)
+        if isinstance(landmarks, str):
+            raise RuntimeError('Cannot detect face landmarks for background/pose generation')
+        im_pts70 = landmarks[0]
+        im_pts70 = torch.clamp((im_pts70 + 1) / 2, min=0, max=1)
 
-            bg = keep_background(image, parsing, stride=1)  # cv form
-            bg = cv2.cvtColor(bg, cv2.COLOR_RGB2BGR)
-            bg = trans(bg)  # 0-1
-            res = bg + im_pts70
-            save_image(res, args.save_path)
+        bg = keep_background(image, parsing, stride=1)  # cv form
+        bg = cv2.cvtColor(bg, cv2.COLOR_RGB2BGR)
+        bg = trans(bg)  # 0-1
+        res = bg + im_pts70
+        save_image(res, args.save_path)
 
 
 if __name__ == '__main__':

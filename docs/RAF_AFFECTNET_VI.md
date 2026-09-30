@@ -73,6 +73,10 @@ python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 \
 `requirements-preprocess.txt`. `--no-au` chỉ bỏ bước LibreFace sau generation;
 không bỏ preprocessing MagicFace.
 
+Với metadata RAF aligned, preprocessing giữ nguyên crop khuôn mặt và chỉ resize
+224→512 trước khi tạo background/pose. Nó không gọi detector để crop lần hai;
+điều này tránh lỗi `The input image must contain a face` trên các crop sát mặt.
+
 Nếu thấy `ModuleNotFoundError: libreface`, có hai cách:
 
 ```bash

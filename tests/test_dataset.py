@@ -18,6 +18,7 @@ from PIL import Image
 
 from inference_dataset import execute_dataset, parse_args, plan_dataset
 from mgface.dataset_inputs import discover_dataset, inspect_item, item_key
+from mgface.preprocess_worker import aligned_input, prepare_aligned_source
 from mgface.verification import report_from_args
 from run_magicface import ROOT, build_command, parse_args as parse_cli
 from verify_results import load_saved_results
@@ -218,6 +219,24 @@ class DatasetTests(unittest.TestCase):
         box = namespace['get_bbox'](np.array([0, 0, 10, 40]), 0.75)
         np.testing.assert_allclose(box[0], [-25, -10])
         np.testing.assert_allclose(box[2], [35, 50])
+
+    def test_raf_aligned_input_is_resized_without_face_crop(self):
+        source, output = self.root / 'aligned_224.jpg', self.root / 'source.png'
+        Image.new('RGB', (224, 224), 'purple').save(source)
+        item = {'source': str(source), 'metadata': {'dataset_name': 'rafdb', 'image_version': 'aligned'}}
+        self.assertTrue(aligned_input(item))
+        prepare_aligned_source(source, output)
+        with Image.open(output) as image:
+            self.assertEqual(image.size, (512, 512))
+            self.assertEqual(image.mode, 'RGB')
+
+    def test_non_aligned_and_non_square_inputs_are_not_silently_distorted(self):
+        generic = {'metadata': {'dataset_name': 'affectnet', 'image_version': 'aligned'}}
+        self.assertFalse(aligned_input(generic))
+        source = self.root / 'not_square.jpg'
+        Image.new('RGB', (224, 200)).save(source)
+        with self.assertRaisesRegex(ValueError, 'must be square'):
+            prepare_aligned_source(source, self.root / 'source.png')
 
 
 if __name__ == '__main__':
