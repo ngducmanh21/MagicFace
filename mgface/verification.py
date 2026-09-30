@@ -18,7 +18,8 @@ from .evidence import validate_fer_annotations
 
 CASE_METADATA_FIELDS = ('label', 'requested_aus', 'seed', 'inference_steps', 'fer',
                         'sample_id', 'dataset_id', 'input_source', 'dataset_metadata',
-                        'background', 'generation_seconds')
+                        'background', 'generation_seconds', 'dataset_name', 'dataset_split',
+                        'source_emotion', 'source_valence', 'source_arousal')
 
 
 def add_report_arguments(parser):
@@ -211,7 +212,7 @@ def _write_html(report, output_dir):
                         f'{esc(dataset_counts.get("images_with_output", "N/A"))} images with output; '
                         f'{esc(dataset_counts.get("generated_edits", "N/A"))} generated edits; '
                         f'{esc(dataset_counts.get("failed_events", "N/A"))} input/preprocessing/generation failure events.</p>')
-    for name in ('dataset_summary.json', 'samples.csv', 'failures.csv'):
+    for name in ('dataset_summary.json', 'samples.csv', 'failures.csv', 'excluded_annotations.csv'):
         if (output_dir / name).is_file():
             links += f' <a href="{name}">{name}</a>'
     evidence_html = ''
@@ -320,7 +321,8 @@ def write_verification_report(cases, output_dir, scores=None, au_delta_scale=Non
     (output_dir / 'manifest.json').write_text(json.dumps({'cases': portable_cases, 'metadata': report['metadata']},
                                                        indent=2, ensure_ascii=False), encoding='utf-8')
     (output_dir / 'results.json').write_text(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
-    fields = ['case', 'sample_id', 'dataset_id', 'label', 'source', 'result', 'seed', 'inference_steps',
+    fields = ['case', 'sample_id', 'dataset_id', 'dataset_name', 'dataset_split', 'source_emotion',
+              'source_valence', 'source_arousal', 'label', 'source', 'result', 'seed', 'inference_steps',
               'generation_seconds', 'status', 'au',
               'requested_delta', 'source_intensity', 'result_intensity', 'measured_delta',
               'expected_delta', 'absolute_error', 'target_out_of_range', 'edited_au_mae', 'unchanged_au_drift']
@@ -332,7 +334,7 @@ def write_verification_report(cases, output_dir, scores=None, au_delta_scale=Non
                 entry = {key: case.get(key) for key in fields if key in case}
                 entry.update(row, case=i + 1)
                 # Prevent spreadsheet programs interpreting labels or paths as formulas.
-                for key in ('sample_id', 'dataset_id', 'label', 'source', 'result'):
+                for key in ('sample_id', 'dataset_id', 'dataset_name', 'dataset_split', 'source_emotion', 'label', 'source', 'result'):
                     if isinstance(entry.get(key), str) and entry[key].startswith(('=', '+', '-', '@')):
                         entry[key] = "'" + entry[key]
                 writer.writerow(entry)

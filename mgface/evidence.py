@@ -1,6 +1,6 @@
 """Evidence tables and metrics. No classifier predictions are inferred here."""
 
-from collections import Counter
+from collections import Counter, defaultdict
 import csv
 import hashlib
 import json
@@ -117,9 +117,29 @@ def summarize_evidence(report):
             score = case[f'{role}_score']
             if score['status'] != 'ok':
                 errors[score.get('error', 'AU scoring unavailable')] += 1
+    groups = defaultdict(list)
+    for case in cases:
+        label = annotations.get((case['source'], 'true'))
+        if label is not None:
+            meta = case.get('dataset_metadata', {})
+            key = (str(case.get('dataset_name') or meta.get('dataset_name') or 'unspecified'),
+                   str(case.get('dataset_split') or meta.get('split') or 'unspecified'), label)
+            groups[key].append(case)
+    source_groups, au_by_emotion = [], []
+    for (dataset, split, emotion), members in sorted(groups.items()):
+        common = {'dataset': dataset, 'split': split, 'source_emotion': emotion}
+        source_groups.append({**common, 'unique_source_images': len({c['source'] for c in members}),
+                              'generated_edits': len(members), 'scored_pairs': sum(c['status'] == 'scored' for c in members)})
+        for name in AU_NAMES:
+            rows = [r for c in members for r in c['au_rows'] if r['au'] == name and r['measured_delta'] is not None]
+            au_by_emotion.append({**common, 'au': name, 'n_scored_pairs': len(rows),
+                                  'source_mean': _average([r['source_intensity'] for r in rows]),
+                                  'result_mean': _average([r['result_intensity'] for r in rows]),
+                                  'change_mean': _average([r['measured_delta'] for r in rows])})
     return {'schema_version': 1, 'n_cases': len(cases), 'n_scored_pairs': report['scored_cases'],
             'n_unscored_pairs': len(cases) - report['scored_cases'],
             'au': au_summary, 'au_control_response': response, 'fer': fer,
+            'source_label_groups': source_groups, 'au_by_source_emotion': au_by_emotion,
             'scoring_failures': [{'reason': reason, 'n_unique_images': count} for reason, count in errors.items()],
             'definitions': {
                 'au_unit': 'Paired edit case; a source repeated across edits contributes once per edit.',
@@ -129,6 +149,7 @@ def summarize_evidence(report):
                 'fer_ground_truth': 'Provided source_true/result_true annotations; requested target emotion is not ground truth.',
                 'fer_macro': 'Mean over classes with true support > 0. Undefined precision contributes zero to macro precision.',
                 'fer_comparison': 'Source/result evaluated separately; their supports may differ. No improvement claim is inferred.',
+                'source_label_groups': 'Only sources with generated output and a supplied source label. These labels do not describe edited-image emotions.',
             }}
 
 
@@ -157,6 +178,12 @@ def write_evidence(report, output_dir, formats=('png', 'svg', 'pdf')):
         path = tables / f'{name}.csv'
         _write_csv(path, rows, list(rows[0]))
         artifacts.append(str(path.relative_to(output_dir)))
+    for name, rows in (('source_label_groups', summary['source_label_groups']),
+                       ('au_by_source_emotion', summary['au_by_source_emotion'])):
+        if rows:
+            path = tables / f'{name}.csv'
+            _write_csv(path, rows, list(rows[0]))
+            artifacts.append(str(path.relative_to(output_dir)))
     for role, data in summary['fer'].items():
         if data['status'] != 'available':
             continue

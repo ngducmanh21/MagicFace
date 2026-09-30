@@ -129,7 +129,12 @@ def build_command(args):
     if is_dataset:
         command = [sys.executable, str(ROOT / 'inference_dataset.py'), '--dataset', str(dataset),
                    '--output_dir', str(output), '--limit', str(args.limit),
-                   '--preprocess_python', python_path(args.preprocess_python, Path.cwd())]
+                   '--preprocess_python', python_path(args.preprocess_python, Path.cwd()),
+                   '--dataset_type', args.dataset_type, '--split', args.split,
+                   '--raf_images', args.raf_images, '--affectnet_classes', str(args.affectnet_classes)]
+        for value, flag in ((args.annotations, '--annotations'), (args.image_root, '--image_root')):
+            if value:
+                command += [flag, str(Path(value).expanduser().resolve())]
         if args.inspect:
             command.append('--inspect')
         if args.prepared_only:
@@ -166,6 +171,12 @@ def parse_args(argv=None):
     dataset.add_argument('--config', default=str(ROOT / 'configs/dataset_demo.json'))
     dataset.add_argument('--output', help='Thu muc output moi; mac dinh tao run theo ten dataset + timestamp.')
     dataset.add_argument('--limit', type=int, default=0, help='So anh toi da; 0 = tat ca.')
+    dataset.add_argument('--dataset-type', choices=('auto', 'generic', 'rafdb', 'affectnet'), default='auto')
+    dataset.add_argument('--split', choices=('all', 'train', 'val', 'test'), default='all', help='Loc split truoc khi ap dung --limit.')
+    dataset.add_argument('--annotations', help='File nhan goc neu khong nam dung vi tri mac dinh.')
+    dataset.add_argument('--image-root', help='Thu muc anh neu khac cau truc mac dinh.')
+    dataset.add_argument('--raf-images', choices=('auto', 'aligned', 'original'), default='auto')
+    dataset.add_argument('--affectnet-classes', type=int, choices=(7, 8), default=8)
     dataset.add_argument('--inspect', action='store_true', help='Kiem tra dataset, khong can GPU hay tai weights.')
     dataset.add_argument('--prepared-only', action='store_true', help='Chi nhan anh da co background/pose.')
     dataset.add_argument('--preprocess-python', help='Python da cai requirements-preprocess.txt; mac dinh Python hien tai.')

@@ -141,6 +141,24 @@ def render_evidence_figures(report, summary, output_dir, formats):
             fig.colorbar(image, ax=ax, fraction=0.035, pad=0.025, label='Measured change')
             save(fig, f'fig_au_changes_{start // 24 + 1:03d}', 'AU changes per edit')
 
+        if summary.get('source_label_groups'):
+            groups = summary['source_label_groups']
+            fig = new_figure('Source emotion labels among generated results',
+                             'Counts = unique source image paths with output, not edited-image classes. Failed inputs are in the dataset summary.',
+                             size=(12, max(5.5, 2.5 + len(groups) * 0.38)))
+            ax = fig.subplots()
+            fig.subplots_adjust(left=0.31, right=0.94, top=0.82, bottom=0.12)
+            counts = [g['unique_source_images'] for g in groups]
+            ax.barh(range(len(groups)), counts, color='#0d9488')
+            ax.set_yticks(range(len(groups)), [f"{g['dataset']} / {g['split']} / {g['source_emotion']}" for g in groups])
+            ax.invert_yaxis()
+            ax.set_xlabel('Unique source images')
+            ax.set_xlim(0, max(counts) * 1.2)
+            for i, count in enumerate(counts):
+                ax.text(count, i, f'  {count}', va='center', fontsize=10)
+            style(ax)
+            save(fig, 'fig_source_emotion_counts', 'Source label distribution')
+
         for role, metrics in summary['fer'].items():
             if metrics['status'] != 'available':
                 continue

@@ -118,7 +118,7 @@ class EvidenceTests(unittest.TestCase):
         index = json.loads((output / 'artifact_index.json').read_text())
         for artifact in index:
             self.assertEqual(artifact['sha256'], hashlib.sha256((output / artifact['path']).read_bytes()).hexdigest())
-        self.assertEqual(len(report['evidence']['figures']), 5)
+        self.assertEqual(len(report['evidence']['figures']), 6)
 
     def test_results_can_be_moved_and_replotted_without_estimator(self):
         self.report()

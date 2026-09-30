@@ -1,6 +1,7 @@
 """Run pretrained MagicFace once per dataset and export aggregate measurements."""
 
 import argparse
+from collections import Counter
 import csv
 from datetime import datetime, timezone
 import gc
@@ -28,7 +29,9 @@ def write_json(path, value):
 
 
 def plan_dataset(args):
-    dataset = discover_dataset(args.dataset, exclude_dir=args.output_dir)
+    dataset = discover_dataset(args.dataset, exclude_dir=args.output_dir, dataset_type=args.dataset_type,
+                               split=args.split, annotations=args.annotations, image_root=args.image_root,
+                               raf_images=args.raf_images, affectnet_classes=args.affectnet_classes)
     selected = dataset['items'][:args.limit] if args.limit else dataset['items']
     ready, raw, errors = [], [], []
     for item in selected:
@@ -95,6 +98,9 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
     counts = {'dataset_images': len(dataset['items']), 'selected_images': len(selected),
               'prepared_inputs': len(ready), 'raw_inputs': len(raw), 'invalid_inputs': len(errors),
               'edits_per_image': len(args.au_requests), 'planned_edits': len(selected) * len(args.au_requests)}
+    counts.update(dataset_kind=dataset['kind'], excluded_annotations=len(dataset.get('excluded_annotations', [])),
+                  selected_class_counts=dict(Counter(item['fer'].get('source_true') or 'unlabeled' for item in selected)),
+                  selected_split_counts=dict(Counter(item['metadata'].get('split') or 'unspecified' for item in selected)))
     print(json.dumps(counts, indent=2), flush=True)
     if args.inspect:
         for error in errors[:20]:
@@ -114,6 +120,8 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
                 'seed': args.seed, 'inference_steps': args.inference_steps,
                 'requested_variations': args.au_requests, 'preprocessing': {}}
     write_json(output / 'dataset_inputs.json', {**dataset, 'items': selected})
+    _csv(output / 'excluded_annotations.csv', dataset.get('excluded_annotations', []),
+         ['annotation', 'sample', 'split', 'reason'])
 
     def save_progress(status):
         nonlocal previous_error_count
@@ -169,7 +177,12 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
             def on_case(case, variant_index):
                 case.update(dataset_id=item['id'], sample_id=f'{item_key(item)}_{variant_index + 1:03d}',
                             input_source=item.get('input_source', item['source']),
-                            dataset_metadata=item['metadata'], fer=item['fer'])
+                            dataset_metadata=item['metadata'], fer=item['fer'],
+                            dataset_name=item['metadata'].get('dataset_name', dataset['kind']),
+                            dataset_split=item['metadata'].get('split', 'unspecified'),
+                            source_emotion=item['fer'].get('source_true'),
+                            source_valence=item['metadata'].get('valence'),
+                            source_arousal=item['metadata'].get('arousal'))
                 case['label'] = f"{item['id']} / {case['label']}"
                 cases.append(case)
                 done_ids.add(item['id'])
@@ -196,7 +209,8 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
             sys.modules['torch'].cuda.empty_cache()
 
     _csv(output / 'samples.csv', cases, ['sample_id', 'dataset_id', 'input_source', 'source', 'background',
-                                        'result', 'requested_aus', 'seed', 'inference_steps', 'generation_seconds'])
+                                        'result', 'requested_aus', 'seed', 'inference_steps', 'generation_seconds',
+                                        'dataset_name', 'dataset_split', 'source_emotion', 'source_valence', 'source_arousal'])
     _csv(output / 'failures.csv', errors, ['dataset_id', 'source', 'stage', 'error'])
     metadata['dataset_counts'] = {**counts, 'images_with_output': len(done_ids),
                                   'generated_edits': len(cases), 'failed_events': len(errors)}
@@ -218,6 +232,12 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dataset', required=True)
+    parser.add_argument('--dataset_type', choices=('auto', 'generic', 'rafdb', 'affectnet'), default='auto')
+    parser.add_argument('--split', choices=('all', 'train', 'val', 'test'), default='all')
+    parser.add_argument('--annotations', help='Native annotation file when it is outside the usual directory.')
+    parser.add_argument('--image_root', help='Directory relative to which annotation image paths are resolved.')
+    parser.add_argument('--raf_images', choices=('auto', 'aligned', 'original'), default='auto')
+    parser.add_argument('--affectnet_classes', type=int, choices=(7, 8), default=8)
     parser.add_argument('--output_dir', required=True)
     parser.add_argument('--au_test', default='AU4+AU1')
     parser.add_argument('--AU_variation', action='append')

@@ -5,6 +5,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from .fer_datasets import canonical_split, detect_dataset_type, read_affectnet, read_rafdb
+
 
 IMAGE_SUFFIXES = {'.jpg', '.jpeg', '.png', '.webp', '.bmp', '.tif', '.tiff'}
 
@@ -19,17 +21,28 @@ def _resolve(value, base):
     return str((base / Path(value).expanduser()).resolve())
 
 
-def discover_dataset(path, exclude_dir=None):
+def discover_dataset(path, exclude_dir=None, dataset_type='auto', split='all', annotations=None,
+                     image_root=None, raf_images='auto', affectnet_classes=8):
     path = Path(path).expanduser().resolve()
     if not path.exists():
         raise ValueError(f'Dataset does not exist: {path}')
+    split = canonical_split(split)
+    selected_type = detect_dataset_type(path) if dataset_type == 'auto' else dataset_type
+    if annotations and selected_type == 'generic':
+        raise ValueError('--annotations needs --dataset-type rafdb or affectnet.')
+    if selected_type == 'rafdb':
+        return read_rafdb(path, split, annotations, image_root, raf_images)
+    if selected_type == 'affectnet':
+        return read_affectnet(path, split, annotations, image_root, affectnet_classes)
+    if selected_type != 'generic':
+        raise ValueError(f'Unsupported dataset type: {selected_type}')
     metadata = {}
     if path.is_dir():
         manifests = [path / name for name in ('dataset.json', 'dataset.csv') if (path / name).is_file()]
         if len(manifests) > 1:
             raise ValueError('Both dataset.json and dataset.csv exist. Pass the desired manifest path explicitly.')
         if manifests:
-            return discover_dataset(manifests[0], exclude_dir=exclude_dir)
+            return discover_dataset(manifests[0], exclude_dir=exclude_dir, dataset_type='generic', split=split)
         image_root = path / 'images' if (path / 'images').is_dir() else path
         backgrounds = path / 'backgrounds'
         excluded = Path(exclude_dir).resolve() if exclude_dir else None
@@ -107,6 +120,10 @@ def discover_dataset(path, exclude_dir=None):
         if row.get('discovery_error'):
             item['discovery_error'] = row['discovery_error']
         items.append(item)
+    if split != 'all':
+        items = [item for item in items if canonical_split(item['metadata'].get('split', '')) == split]
+        if not items:
+            raise ValueError(f'No generic dataset items explicitly annotated with split={split!r}.')
     return {'path': str(path), 'kind': kind, 'metadata': metadata, 'items': items}
 
 

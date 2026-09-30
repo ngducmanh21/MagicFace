@@ -1,5 +1,8 @@
 # Một đường dẫn dataset → ảnh chỉnh sửa + report AU/FER
 
+**RAF-DB / AffectNet:** xem [hướng dẫn riêng](RAF_AFFECTNET_VI.md) để đọc TXT,
+CSV/NPY hoặc folder classes đúng mapping và chọn split.
+
 CLI này dùng weights **[mengtingwei/magicface trên Hugging Face](https://huggingface.co/mengtingwei/magicface)**, với SD 1.5
 làm base. Không cần train hay tự tạo checkpoint trước.
 
@@ -206,7 +209,8 @@ Chưa có tự động resume; dùng thư mục output mới khi chạy lại.
 
 ## 6. FER và dữ liệu nhãn
 
-Không suy ra nhãn cảm xúc từ tên thư mục và không coi AU yêu cầu là ground truth.
+Chế độ generic không suy ra nhãn cảm xúc từ tên thư mục; ngoại lệ được khai báo
+rõ là `--dataset-type affectnet` cho folder class 0–7. Không coi AU yêu cầu là ground truth.
 Input JSON có thể thêm `fer: {"source_true": "happy", "source_pred": "happy"}`;
 CSV có thể thêm hai cột `source_true`, `source_pred`. Đây chỉ là ví dụ schema:
 hãy dùng nhãn thật và dự đoán của bạn. Không gán nhãn của ảnh gốc cho mọi ảnh sinh.
