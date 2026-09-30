@@ -155,6 +155,8 @@ MAGICFACE_AU_PYTHON="$(pwd)/.venv-au/bin/python"
 ```
 
 Không activate `.venv-au`; giữ `.venv` làm môi trường chính chạy CLI.
+Truyền nguyên đường dẫn `.venv-au/bin/python`, không thay bằng target symlink
+trong `~/.local/share/uv/python/`: Python gốc không thấy packages của virtualenv.
 
 Nếu Dlib báo thiếu compiler/CMake khi cài, cần cài build tools của hệ điều hành
 trước; tham khảo [hướng dẫn LibreFace](https://github.com/ihp-lab/LibreFace#-installation).

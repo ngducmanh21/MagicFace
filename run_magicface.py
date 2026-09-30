@@ -32,7 +32,14 @@ def python_path(value, base):
         return sys.executable
     if not isinstance(value, str) or not value.strip():
         raise ValueError('au_python phai la duong dan Python, hoac null.')
-    return str(resolve_path(value, base)) if '/' in value or '\\' in value or value.startswith('~') else value
+    if '/' not in value and '\\' not in value and not value.startswith('~'):
+        return value
+    # Do not call Path.resolve(): a virtualenv's bin/python is normally a
+    # symlink, and resolving it discards that environment's site-packages.
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = Path(base) / path
+    return os.path.abspath(os.fspath(path))
 
 
 def report_options(backend, python, device, title, formats, scale):
