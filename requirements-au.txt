@@ -1,0 +1,5 @@
+# Install in a separate environment; use --au_python to select it.
+libreface==0.2.0
+# LibreFace uses the legacy MediaPipe solutions API and Image.ANTIALIAS.
+mediapipe==0.10.5
+Pillow==9.5.0

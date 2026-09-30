@@ -1,25 +1,15 @@
 
 import argparse
+import json
 import os
+from pathlib import Path
 
-import numpy as np
-import torch
-import torch.utils.checkpoint
-import torchvision.transforms as transforms
 from PIL import Image
-from diffusers import AutoencoderKL
-from diffusers import (
-    UniPCMultistepScheduler,
-)
-from transformers import CLIPTextModel, CLIPTokenizer
-
-from mgface.pipelines_mgface.pipeline_mgface import MgPipeline as MgPipelineInference
-from mgface.pipelines_mgface.unet_ID_2d_condition import UNetID2DConditionModel
-from mgface.pipelines_mgface.unet_deno_2d_condition import UNetDeno2DConditionModel
+from mgface.au import AU_NAMES, parse_au_request
+from mgface.verification import add_report_arguments, report_from_args, validate_scale
 
 # AU mapping
-ind_dict = {'AU1':0, 'AU2':1, 'AU4':2, 'AU5':3, 'AU6':4, 'AU9':5,
-            'AU12':6, 'AU15':7, 'AU17':8, 'AU20':9, 'AU25':10, 'AU26':11}
+ind_dict = {name: index for index, name in enumerate(AU_NAMES)}
 
 def parse_args(input_args=None):
     parser = argparse.ArgumentParser(description="Simple example of a MagicFace test script.")
@@ -48,7 +38,7 @@ def parse_args(input_args=None):
     )
 
     parser.add_argument("--seed", type=int, default=424,
-                        help="A seed for reproducible training.")
+                        help="Inference seed, reset for every AU variant for comparison.")
 
     parser.add_argument(
         "--inference_steps",
@@ -77,7 +67,9 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--AU_variation",
         type=str,
-        default='',
+        action='append',
+        required=True,
+        help="AU changes separated by '+'. Repeat this option to compare multiple edits.",
     )
 
     parser.add_argument(
@@ -97,27 +89,42 @@ def parse_args(input_args=None):
         type=str,
         default='edited_images',
     )
+    parser.add_argument('--verify', action='store_true',
+                        help='Export a visual report with measured AU intensities. Automatic for multiple edits.')
+    parser.add_argument('--verification_dir', default=None)
+    add_report_arguments(parser)
 
     if input_args is not None:
         args = parser.parse_args(input_args)
     else:
         args = parser.parse_args()
 
+    try:
+        args.au_requests = [parse_au_request(args.au_test, value) for value in args.AU_variation]
+        validate_scale(args.au_delta_scale)
+        if args.inference_steps <= 0:
+            raise ValueError('--inference_steps must be positive.')
+        for path in (args.img_path, args.bg_path):
+            if not path or not Path(path).is_file():
+                raise ValueError(f'Input image does not exist: {path!r}')
+    except (TypeError, ValueError) as exc:
+        parser.error(str(exc))
     return args
 
 
 def make_data(args):
-
+    import torchvision.transforms as transforms
     transform = transforms.ToTensor()
 
     img_name = args.img_path
     bg_name = args.bg_path
 
-    source = Image.open(img_name)
-    source = transform(source)
-
-    bg = Image.open(bg_name)
-    bg = transform(bg)
+    with Image.open(img_name) as image:
+        source = transform(image.convert('RGB'))
+    with Image.open(bg_name) as image:
+        bg = transform(image.convert('RGB'))
+    if source.shape != bg.shape:
+        raise ValueError('Source and background images must have matching dimensions.')
 
     return source, bg
 
@@ -135,7 +142,16 @@ def tokenize_captions(tokenizer, captions, max_length):
 
 
 def main(args):
+    import numpy as np
+    import torch
+    from diffusers import AutoencoderKL, UniPCMultistepScheduler
+    from transformers import CLIPTextModel, CLIPTokenizer
+    from mgface.pipelines_mgface.pipeline_mgface import MgPipeline as MgPipelineInference
+    from mgface.pipelines_mgface.unet_ID_2d_condition import UNetID2DConditionModel
+    from mgface.pipelines_mgface.unet_deno_2d_condition import UNetDeno2DConditionModel
 
+    # Validate/read images before downloading model weights.
+    source, bg = make_data(args)
     device = 'cuda'
     denoising_unet_path = args.denoising_unet_path
     ID_unet_path = args.ID_unet_path
@@ -204,69 +220,46 @@ def main(args):
     pipeline.scheduler = UniPCMultistepScheduler.from_config(pipeline.scheduler.config)
     pipeline.set_progress_bar_config(disable=True)
 
-    if args.seed is None:
-        generator = None
-    else:
-        generator = torch.Generator(device=device).manual_seed(args.seed)
-
-    source, bg = make_data(args)
     prompt = 'A close up of a person.'
     source = source.unsqueeze(0)
     bg = bg.unsqueeze(0)
     
     prompt_embeds = text_encoder(tokenize_captions(tokenizer, [prompt], 2).to(device))[0]
-    au_prompt = np.zeros((12,))
-    au_test_file = args.au_test
-    AU_variation = args.AU_variation
-
-    if '+' not in au_test_file:
-        print('you are testing editing with a single AU')
-        tgt_au_ind = au_test_file
-        au_change = int(AU_variation)
-        au_prompt[ind_dict[tgt_au_ind]] = au_change
-    else:
-        print('you are testing editing with AU combinations')
-        au_test_file = au_test_file.split('+')
-        AU_variation = AU_variation.split('+')
-
-        for item1, item2 in zip(au_test_file, AU_variation):
-            tgt_au_ind = item1
-            au_prompt[ind_dict[tgt_au_ind]] = item2
-    
-    print(au_prompt)
-
     saved_path = args.saved_path
     os.makedirs(saved_path, exist_ok=True)
-    img_name = args.img_path.split('/')[-1]
+    image_path = Path(args.img_path)
+    cases = []
+    for index, requested in enumerate(args.au_requests):
+        # Reuse the initial noise for every variant: only the AU condition changes.
+        generator = torch.Generator(device=device).manual_seed(args.seed) if args.seed is not None else None
+        au_prompt = np.array([requested.get(name, 0.0) for name in AU_NAMES], dtype=np.float32)
+        tor_exp = torch.from_numpy(au_prompt).unsqueeze(0)
+        sample = pipeline(
+            prompt_embeds=prompt_embeds, source=source, bg=bg, au=tor_exp,
+            num_inference_steps=args.inference_steps, generator=generator,
+        ).images[0]
+        filename = (image_path.name if len(args.au_requests) == 1
+                    else f'{image_path.stem}_edit_{index + 1:03d}.png')
+        result_path = Path(saved_path) / filename
+        if result_path.resolve() in (image_path.resolve(), Path(args.bg_path).resolve()):
+            raise ValueError('--saved_path would overwrite an input image. Choose another directory.')
+        sample.save(result_path)
+        label = ', '.join(f'{name} {value:+g}' for name, value in requested.items())
+        cases.append({'source': str(image_path.resolve()), 'result': str(result_path.resolve()),
+                      'requested_aus': requested, 'label': label, 'seed': args.seed,
+                      'inference_steps': args.inference_steps})
+        print(f'Saved {label}: {result_path}')
 
-    tor_exp = torch.from_numpy(au_prompt).unsqueeze(0)
-    samples = pipeline(
-        prompt_embeds=prompt_embeds,
-        source=source,
-        bg = bg,
-        au=tor_exp,
-        num_inference_steps=args.inference_steps,
-        generator=generator,
-    ).images[0]
-    samples.save(os.path.join(saved_path, img_name))
+    if args.verify or args.evidence or len(cases) > 1:
+        report_dir = Path(args.verification_dir or Path(saved_path) / f'{image_path.stem}_verification')
+        report_dir.mkdir(parents=True, exist_ok=True)
+        metadata = {'base_model': args.pretrained_model_name_or_path, 'ID_unet': args.ID_unet_path,
+                    'denoising_unet': args.denoising_unet_path, 'revision': args.revision,
+                    'variant': args.variant, 'prompt': prompt, 'background': str(Path(args.bg_path).resolve())}
+        # Persist before scoring, so reports can be rebuilt without generating images again.
+        (report_dir / 'manifest.json').write_text(json.dumps({'cases': cases, 'metadata': metadata}, indent=2))
+        report_from_args(cases, report_dir, args, metadata=metadata)
     print('done')
-    # exps = np.load(os.path.join('./test_aus/test_relative_aus', au_test_file))
-    # saved_path = os.path.join('./test_out/test_out_only_wild_cartoon2', au_test_file.replace('.npy', ''))
-    # os.makedirs(saved_path, exist_ok=True)
-    # for i, exp in enumerate(exps):
-    #
-    #     tor_exp = torch.from_numpy(exp)
-    #     tor_exp = tor_exp.unsqueeze(0)
-    #     samples = pipeline(
-    #         prompt_embeds=prompt_embeds,
-    #         source=source,
-    #         bg = bg,
-    #         au=tor_exp,
-    #         num_inference_steps=args.inference_steps,
-    #         generator=generator,
-    #     ).images[0]
-    #     samples.save(os.path.join(saved_path, f'{i:03}.jpg'))
-    # print('done')
 
 if __name__ == "__main__":
     args = parse_args()

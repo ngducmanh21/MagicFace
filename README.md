@@ -116,6 +116,31 @@ python preprocess.py --img_path <your-image-path> --save_path <your-save-path>
 python retrieve_bg.py --img_path <your-cropped-path> --save_path <your-save-path>
 ```
 4. Use the `inference.py` script introduced above to test your image.
+### Visual verification and AU scores
+
+Add `--verify` to export a before/after sheet, a browsable HTML report and AU scores
+in CSV/JSON. Repeat `--AU_variation` to compare several edits using the same seed:
+
+```console
+python inference.py --img_path test_images/00381.png --bg_path test_images/00381_bg.png --au_test 'AU4+AU1' --AU_variation '0+0' --AU_variation '2+1' --AU_variation '4+2' --verify --au_python /path/to/libreface-env/bin/python
+```
+
+Measured scores require the separate LibreFace environment described in
+[the verification guide](docs/verification.md). `--au_backend none` explicitly
+creates a visual-only report with `N/A` scores. The guide also covers reports from
+existing images, score interpretation and reuse during training validation.
+
+Add `--evidence` for AU plots in PNG/SVG/PDF, summary tables, run configuration
+and checksums. Manifests with true/predicted emotion labels also produce FER
+confusion matrices and per-class precision/recall/F1. Existing reports can be
+expanded without running the models again:
+
+```console
+python verify_results.py --results_json runs/au_review/00381_verification/results.json --output_dir runs/au_evidence --evidence
+```
+
+See [the evidence output and FER label schema](docs/verification.md#experiment-evidence-and-fer-evaluation).
+
 ### Issues or Questions?
 If the issue is code-related, please open an issue here.
 

@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "purpose": "Layout preview only. Result images repeat the sources; no model editing or AU scoring has been performed."
+  },
+  "cases": [
+    {
+      "source": "../test_images/00381.png",
+      "result": "../test_images/00381.png",
+      "requested_aus": {"AU4": 0, "AU1": 0},
+      "label": "Layout preview / unchanged source 00381"
+    },
+    {
+      "source": "../test_images/00025.png",
+      "result": "../test_images/00025.png",
+      "requested_aus": {"AU12": 0},
+      "label": "Layout preview / unchanged source 00025"
+    },
+    {
+      "source": "../test_images/00512.png",
+      "result": "../test_images/00512.png",
+      "requested_aus": {"AU6": 0, "AU12": 0},
+      "label": "Layout preview / unchanged source 00512"
+    }
+  ]
+}
