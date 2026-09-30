@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 from inference import parse_args as parse_inference_args
-from run_magicface import ROOT, build_command, main, parse_args
+from run_magicface import ROOT, build_command, check_python_imports, main, parse_args
 
 
 class CliTests(unittest.TestCase):
@@ -103,6 +103,14 @@ class CliTests(unittest.TestCase):
         with patch('run_magicface.subprocess.run', return_value=SimpleNamespace(returncode=7)), \
                 contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(main(['preview', '--output', str(self.directory / 'out')]), 7)
+
+    def test_dependency_probe_reports_the_python_and_missing_import(self):
+        result = SimpleNamespace(returncode=1, stderr='Traceback\nModuleNotFoundError: No module named insightface\n', stdout='')
+        with patch('run_magicface.subprocess.run', return_value=result) as run, \
+                self.assertRaisesRegex(RuntimeError, 'No module named insightface'):
+            check_python_imports('/magicface/python', ('torch', 'insightface'))
+        self.assertEqual(run.call_args.args[0],
+                         ['/magicface/python', '-c', 'import torch; import insightface'])
 
     def test_dataset_inspect_does_not_run_parent_preflight_or_print_report(self):
         dataset = ROOT / 'test_images'

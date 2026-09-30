@@ -91,6 +91,8 @@ python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 \
 
 Không nên chạy MagicFace bằng `.venv` của một project FER khác nếu môi trường đó
 chưa cài `requirements-inference.txt` và `requirements-preprocess.txt`.
+CLI kiểm tra các import preprocessing trước khi tải assets; nếu thiếu `insightface`
+hoặc ONNX/OpenCV, generation chưa bắt đầu và output cũ không nên được tái sử dụng.
 
 Nếu annotation/ảnh đặt ở chỗ khác:
 

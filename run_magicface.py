@@ -52,6 +52,16 @@ def report_options(backend, python, device, title, formats, scale):
     return options
 
 
+def check_python_imports(python, modules):
+    """Fail before model/asset downloads when a delegated Python lacks dependencies."""
+    statement = '; '.join(f'import {module}' for module in modules)
+    result = subprocess.run([python, '-c', statement], cwd=ROOT, capture_output=True, text=True)
+    if result.returncode:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        detail = detail[-1] if detail else f'exit code {result.returncode}'
+        raise RuntimeError(f'{python}: {detail}')
+
+
 def build_command(args):
     """Return argv and output directory. Building/dry-running never loads models."""
     if args.command == 'preview':
@@ -223,6 +233,16 @@ def main(argv=None):
                   f"prepared={len(ready)}, preprocess={len(raw)}, invalid={len(errors)}", flush=True)
             for error in errors[:5]:
                 print(f"  invalid {error['dataset_id']}: {error['error']}", file=sys.stderr)
+            if raw:
+                try:
+                    check_python_imports(dataset_args.preprocess_python,
+                                         ('torch', 'torchvision', 'cv2', 'scipy', 'onnxruntime', 'insightface'))
+                except (OSError, RuntimeError) as exc:
+                    print(f'Moi truong preprocessing chua san sang: {exc}\n'
+                          f'Python dang dung: {dataset_args.preprocess_python}\n'
+                          'Cai requirements-preprocess.txt trong moi truong MagicFace rieng, '
+                          'roi chay CLI bang Python do.', file=sys.stderr)
+                    return 2
         except (ImportError, OSError, ValueError, SystemExit) as exc:
             print(f'Dataset khong hop le: {exc}\n'
                   'RAF-DB: truyen root basic/, hoac truyen --annotations va --image-root.\n'
