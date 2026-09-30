@@ -2,3 +2,5 @@ __pycache__/
 *.py[cod]
 runs/
 weights_libreface/
+.venv/
+.venv-au/

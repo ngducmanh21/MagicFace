@@ -1,6 +1,9 @@
 # MagicFace
 Official implementation of MagicFace
 
+**Hướng dẫn chạy tiếng Việt:** [QUICKSTART_VI.md](docs/QUICKSTART_VI.md)
+— dùng `python run_magicface.py preview`, `run` hoặc `report`.
+
 > **MagicFace: High-Fidelity Facial Expression Editing with Action-Unit Control** [[arXiv paper](http://arxiv.org/abs/2501.02260)]<br>
 > Mengting Wei, Tuomas Varanka, Xingxun Jiang, Huai-Qian Khor, Guoying Zhao<br>
 > University of Oulu

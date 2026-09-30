@@ -1,0 +1,3 @@
+# CPU-only preview/replot; no torch, model weights or LibreFace needed.
+Pillow==11.1.0
+matplotlib==3.10.0

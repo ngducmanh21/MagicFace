@@ -1,0 +1,15 @@
+{
+  "image": "../test_images/00381.png",
+  "background": "../test_images/00381_bg.png",
+  "output_dir": "../runs/demo_00381",
+  "aus": ["AU4", "AU1"],
+  "variations": [[0, 0], [2, 1], [4, 2]],
+  "seed": 424,
+  "inference_steps": 50,
+  "title": "MagicFace / AU4 + AU1 / seed 424",
+  "au_backend": "libreface",
+  "au_python": null,
+  "au_device": "cpu",
+  "au_delta_scale": null,
+  "figure_formats": ["png", "svg", "pdf"]
+}
