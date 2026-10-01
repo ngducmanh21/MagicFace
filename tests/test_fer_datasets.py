@@ -17,6 +17,8 @@ from mgface.dataset_inputs import discover_dataset
 from mgface.fer_datasets import AFFECTNET_LABELS, RAF_LABELS
 from run_magicface import build_command, parse_args as cli_args
 
+ROOT = Path(__file__).resolve().parents[1]
+
 
 class NativeDatasetTests(unittest.TestCase):
     def setUp(self):
@@ -204,7 +206,8 @@ class NativeDatasetTests(unittest.TestCase):
 
     def test_explicit_annotation_and_image_root_overrides(self):
         root, labels = self.raf()
-        _, args = cli_args(['dataset', str(root), '--dataset-type', 'rafdb', '--split', 'test',
+        _, args = cli_args(['dataset', str(root), '--config', str(ROOT / 'configs/inference_demo.json'),
+                            '--dataset-type', 'rafdb', '--split', 'test',
                             '--annotations', str(labels), '--image-root', str(root / 'Image/original'),
                             '--raf-images', 'original', '--limit', '1', '--inspect'])
         command, _ = build_command(args)

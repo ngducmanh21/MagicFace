@@ -39,26 +39,29 @@ class CliTests(unittest.TestCase):
         self.assertEqual(parsed.au_backend, 'none')
         self.assertTrue(parsed.evidence)
 
-    def test_dataset_default_config_is_a_valid_single_au_50_image_sweep(self):
+    def test_dataset_default_config_is_an_audited_anger_cell_sweep(self):
         _, args = parse_args(['dataset', str(ROOT / 'test_images'), '--dry-run', '--no-au'])
         command, _ = build_command(args)
         parsed = parse_dataset_args(command[2:])
-        self.assertEqual(parsed.limit, 50)
-        self.assertEqual(parsed.min_images, 50)
-        self.assertEqual(len(parsed.au_requests), 17)
+        self.assertEqual(parsed.dataset_type, 'rafdb')
+        self.assertEqual(parsed.split, 'train')
+        self.assertEqual(parsed.limit, 0)
+        self.assertEqual(parsed.min_images, 0)
+        self.assertEqual(len(parsed.au_requests), 9)
+        self.assertEqual(Path(parsed.cell_selection), ROOT / 'configs/anger_cells_magicface.json')
         self.assertEqual(sum(all(value == 0 for value in request.values())
                              for request in parsed.au_requests), 1)
         self.assertTrue(all(sum(value != 0 for value in request.values()) <= 1
                             for request in parsed.au_requests))
-        for au in ('AU1', 'AU4', 'AU6', 'AU12'):
+        for au in ('AU5', 'AU25'):
             self.assertEqual(sorted(request[au] for request in parsed.au_requests if request[au]),
                              [1, 2, 3, 4])
 
     def test_single_au_config_rejects_combinations_and_missing_baseline(self):
         config = json.loads((ROOT / 'configs/dataset_demo.json').read_text())
         config['limit'] = 1
-        for variations, message in (([[0, 0, 0, 0], [1, 1, 0, 0]], 'single_au_only'),
-                                    ([[1, 0, 0, 0]], 'zero-edit baseline')):
+        for variations, message in (([[0, 0], [1, 1]], 'single_au_only'),
+                                    ([[1, 0]], 'zero-edit baseline')):
             config['variations'] = variations
             self.path.write_text(json.dumps(config))
             _, args = parse_args(['dataset', str(ROOT / 'test_images'), '--config', str(self.path)])

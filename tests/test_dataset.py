@@ -201,13 +201,14 @@ class DatasetTests(unittest.TestCase):
         self.assertEqual(command[command.index('--preprocess_python') + 1], sys.executable)
 
     def test_dataset_cli_inspects_without_au_environment_or_gpu(self):
-        _, args = parse_cli(['dataset', str(self.dataset), '--inspect', '--limit', '1',
+        demo_config = str(ROOT / 'configs/inference_demo.json')
+        _, args = parse_cli(['dataset', str(self.dataset), '--config', demo_config, '--inspect', '--limit', '1',
                              '--output', str(self.output), '--au-python', '/missing/python'])
         command, output = build_command(args)
         self.assertIn('--dataset', command)
         self.assertEqual(output, self.output)
         result = subprocess.run([sys.executable, str(ROOT / 'run_magicface.py'), 'dataset', str(self.dataset),
-                                 '--inspect', '--limit', '1', '--output', str(self.output),
+                                 '--config', demo_config, '--inspect', '--limit', '1', '--output', str(self.output),
                                  '--au-python', '/missing/python'],
                                 cwd='/', capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)

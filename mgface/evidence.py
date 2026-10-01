@@ -139,10 +139,42 @@ def summarize_evidence(report):
                                   'source_mean': _average([r['source_intensity'] for r in rows]),
                                   'result_mean': _average([r['result_intensity'] for r in rows]),
                                   'change_mean': _average([r['measured_delta'] for r in rows])})
+    rare_cell_summary, rare_cell_response = [], []
+    cell_groups = defaultdict(list)
+    for case in cases:
+        if case.get('cell_id'):
+            cell_groups[case['cell_id']].append(case)
+    for cell_id, members in sorted(cell_groups.items()):
+        metadata = members[0].get('dataset_metadata', {})
+        target = members[0].get('target_au') or metadata.get('target_au')
+        common = {
+            'cell_id': cell_id, 'emotion': members[0].get('source_emotion'),
+            'A': '+'.join(metadata.get('cell_A', [])), 'target_au': target,
+            'n_A': metadata.get('n_A'), 'n_Ax_exact': metadata.get('n_Ax_exact'),
+            'n_Ax_superset': metadata.get('n_Ax_superset'),
+            'n_Ax_other_emotions': metadata.get('n_Ax_other_emotions'),
+            'x_lift': metadata.get('x_lift'), 'x_probe_auroc': metadata.get('x_probe_auroc'),
+            'selection_status': metadata.get('selection_status'),
+            'acceptance_status': metadata.get('acceptance_status'),
+        }
+        rare_cell_summary.append({**common,
+                                  'unique_sources': len({case['source'] for case in members}),
+                                  'generated_cases': len(members),
+                                  'scored_cases': sum(case['status'] == 'scored' for case in members)})
+        levels = sorted({case['requested_aus'].get(target, 0.0) for case in members})
+        for level in levels:
+            selected_members = [case for case in members if case['requested_aus'].get(target, 0.0) == level]
+            measurements = [row['measured_delta'] for case in selected_members for row in case['au_rows']
+                            if row['au'] == target and row['measured_delta'] is not None]
+            stats = _stats(measurements)
+            rare_cell_response.append({**common, 'requested_delta': level,
+                                       'n_total': len(selected_members), 'n_scored': stats['n'],
+                                       'change_mean': stats['mean'], 'change_std': stats['std']})
     return {'schema_version': 1, 'n_cases': len(cases), 'n_scored_pairs': report['scored_cases'],
             'n_unscored_pairs': len(cases) - report['scored_cases'],
             'au': au_summary, 'au_control_response': response, 'fer': fer,
             'source_label_groups': source_groups, 'au_by_source_emotion': au_by_emotion,
+            'rare_cell_summary': rare_cell_summary, 'rare_cell_response': rare_cell_response,
             'scoring_failures': [{'reason': reason, 'n_unique_images': count} for reason, count in errors.items()],
             'definitions': {
                 'au_unit': 'Paired edit case; a source repeated across edits contributes once per edit.',
@@ -153,6 +185,7 @@ def summarize_evidence(report):
                 'fer_macro': 'Mean over classes with true support > 0. Undefined precision contributes zero to macro precision.',
                 'fer_comparison': 'Source/result evaluated separately; their supports may differ. No improvement claim is inferred.',
                 'source_label_groups': 'Only sources with generated output and a supplied source label. These labels do not describe edited-image emotions.',
+                'rare_cell_acceptance': 'Source/cell selection is prequalified. Generated outputs remain ungated until OpenGraphAU, AUCANet and dlib gates are evaluated.',
             }}
 
 
@@ -182,7 +215,9 @@ def write_evidence(report, output_dir, formats=('png', 'svg', 'pdf')):
         _write_csv(path, rows, list(rows[0]))
         artifacts.append(str(path.relative_to(output_dir)))
     for name, rows in (('source_label_groups', summary['source_label_groups']),
-                       ('au_by_source_emotion', summary['au_by_source_emotion'])):
+                       ('au_by_source_emotion', summary['au_by_source_emotion']),
+                       ('rare_cell_summary', summary['rare_cell_summary']),
+                       ('rare_cell_response', summary['rare_cell_response'])):
         if rows:
             path = tables / f'{name}.csv'
             _write_csv(path, rows, list(rows[0]))
@@ -207,6 +242,9 @@ def write_evidence(report, output_dir, formats=('png', 'svg', 'pdf')):
     config['figure_formats'] = list(formats)
     (output_dir / 'run_config.json').write_text(json.dumps(config, indent=2), encoding='utf-8')
     artifacts.extend(('summary.json', 'run_config.json'))
+    for optional in ('cell_selection.json', 'dataset_inputs.json'):
+        if (output_dir / optional).is_file():
+            artifacts.append(optional)
     # Checksums cover precisely the exported evidence files, not an entire working directory.
     index = [{'path': path, 'sha256': hashlib.sha256((output_dir / path).read_bytes()).hexdigest()}
              for path in artifacts]

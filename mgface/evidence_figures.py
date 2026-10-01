@@ -113,6 +113,42 @@ def render_evidence_figures(report, summary, output_dir, formats):
             style(ax)
         save(fig, 'fig_au_control_response', 'AU control response')
 
+        if summary.get('rare_cell_response'):
+            cell_names = list(dict.fromkeys(row['cell_id'] for row in summary['rare_cell_response']))
+            columns = min(2, len(cell_names))
+            rows_count = (len(cell_names) + columns - 1) // columns
+            fig = new_figure('Rare Anger cell response',
+                             'Each panel uses only its audited source allowlist. Zero is the MagicFace +0 baseline; outputs are not gate-approved.',
+                             size=(12, 3.5 * rows_count + 1.5))
+            axes = fig.subplots(rows_count, columns, squeeze=False)
+            fig.subplots_adjust(left=0.09, right=0.97, top=0.84, bottom=0.09, hspace=0.55, wspace=0.3)
+            for ax in axes.flat:
+                ax.set_visible(False)
+            for ax, cell_id in zip(axes.flat, cell_names):
+                ax.set_visible(True)
+                group = [row for row in summary['rare_cell_response'] if row['cell_id'] == cell_id]
+                measured = [row for row in group if row['n_scored']]
+                target = group[0]['target_au']
+                ax.set_title(f'{cell_id}: A={group[0]["A"]} → +{target}', fontweight='bold')
+                ax.axhline(0, color='#cbd5e1', lw=1)
+                if measured:
+                    x = [row['requested_delta'] for row in measured]
+                    y = [row['change_mean'] for row in measured]
+                    ax.plot(x, y, 'o-', color='#0d9488')
+                    for row in measured:
+                        if row['change_std'] is not None:
+                            ax.errorbar(row['requested_delta'], row['change_mean'], yerr=row['change_std'],
+                                        color='#0d9488', capsize=4)
+                        ax.annotate(f"{row['n_scored']}/{row['n_total']}",
+                                    (row['requested_delta'], row['change_mean']), xytext=(4, 8),
+                                    textcoords='offset points', fontsize=8)
+                else:
+                    ax.text(0.5, 0.5, 'AU scores unavailable', transform=ax.transAxes, ha='center')
+                ax.set_xlabel(f'Requested {target} change')
+                ax.set_ylabel('Measured intensity change')
+                style(ax)
+            save(fig, 'fig_rare_cell_response', 'Rare Anger cell response')
+
         for start in range(0, len(report['cases']), 24):
             cases = report['cases'][start:start + 24]
             height = max(5.5, 2.4 + len(cases) * 0.38)

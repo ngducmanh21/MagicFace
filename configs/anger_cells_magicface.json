@@ -1,0 +1,47 @@
+{
+  "version": "2026-09-30c",
+  "scope": "Anger only; audited R1-R7 + R8 + R10 cells to generate",
+  "source_sha256": "7ce3342c42d391d9a534ccfda6877eccb246c14822417f3ce82ec8c8495fc741",
+  "cells": [
+    {
+      "cell_id": "anger_4_25_au5", "emotion": "Anger", "A": "4+25", "x": "AU5",
+      "n_A": 34, "n_Ax_exact": 3, "n_Ax_superset": 23, "n_Ax_other_emotions": 12,
+      "x_lift": 0.967, "x_emfacs": true, "controls_y": ["AU9", "AU26"],
+      "R1_R7_pass": true, "R8_codebook": true, "R10_drawable": true, "x_probe_auroc": 0.9311,
+      "sources_aligned_S1": ["train_00023", "train_00836", "train_02043", "train_02079", "train_03619", "train_04529", "train_04780", "train_04993", "train_05248", "train_06341", "train_06401", "train_07576", "train_08218", "train_08760", "train_08912"],
+      "status": "to_generate"
+    },
+    {
+      "cell_id": "anger_4_17_au5", "emotion": "Anger", "A": "4+17", "x": "AU5",
+      "n_A": 23, "n_Ax_exact": 2, "n_Ax_superset": 0, "n_Ax_other_emotions": 36,
+      "x_lift": 0.967, "x_emfacs": true, "controls_y": ["AU9"],
+      "R1_R7_pass": true, "R8_codebook": true, "R10_drawable": true, "x_probe_auroc": 0.9311,
+      "sources_aligned_S1": ["train_00578", "train_00772", "train_04546", "train_04859", "train_06611", "train_07293", "train_07438"],
+      "status": "to_generate"
+    },
+    {
+      "cell_id": "anger_4_17_au25", "emotion": "Anger", "A": "4+17", "x": "AU25",
+      "n_A": 23, "n_Ax_exact": 1, "n_Ax_superset": 3, "n_Ax_other_emotions": 12,
+      "x_lift": 1.718, "x_emfacs": true, "controls_y": ["AU9"],
+      "R1_R7_pass": true, "R8_codebook": true, "R10_drawable": true, "x_probe_auroc": 0.9506,
+      "sources_aligned_S1": ["train_00578", "train_00772", "train_04546", "train_06611", "train_07293", "train_07438"],
+      "status": "to_generate"
+    },
+    {
+      "cell_id": "anger_25_au5", "emotion": "Anger", "A": "25", "x": "AU5",
+      "n_A": 13, "n_Ax_exact": 2, "n_Ax_superset": 29, "n_Ax_other_emotions": 12,
+      "x_lift": 0.967, "x_emfacs": true, "controls_y": ["AU4", "AU9", "AU26"],
+      "R1_R7_pass": true, "R8_codebook": true, "R10_drawable": true, "x_probe_auroc": 0.9311,
+      "sources_aligned_S1": ["train_01191", "train_04490", "train_05018", "train_06409", "train_07477", "train_08176"],
+      "status": "to_generate"
+    },
+    {
+      "cell_id": "anger_17_au5", "emotion": "Anger", "A": "17", "x": "AU5",
+      "n_A": 10, "n_Ax_exact": 1, "n_Ax_superset": 1, "n_Ax_other_emotions": 18,
+      "x_lift": 0.967, "x_emfacs": true, "controls_y": ["AU4"],
+      "R1_R7_pass": true, "R8_codebook": true, "R10_drawable": true, "x_probe_auroc": 0.9311,
+      "sources_aligned_S1": ["train_06717", "train_07224", "train_07292", "train_07295"],
+      "status": "to_generate"
+    }
+  ]
+}

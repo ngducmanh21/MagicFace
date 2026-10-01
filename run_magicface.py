@@ -20,7 +20,7 @@ CONFIG_KEYS = {'image', 'background', 'output_dir', 'aus', 'variations', 'seed',
                'inference_steps', 'title', 'au_python', 'au_backend', 'au_device',
                'au_delta_scale', 'figure_formats', 'base_model', 'id_model', 'denoising_model',
                'limit', 'min_images', 'dataset_type', 'split', 'raf_images',
-               'affectnet_classes', 'single_au_only', 'require_zero_baseline'}
+               'affectnet_classes', 'single_au_only', 'require_zero_baseline', 'cell_selection'}
 
 
 def resolve_path(value, base):
@@ -171,6 +171,12 @@ def build_command(args):
                    '--preprocess_python', python_path(args.preprocess_python, Path.cwd()),
                    '--dataset_type', dataset_type, '--split', split,
                    '--raf_images', raf_images, '--affectnet_classes', str(affectnet_classes)]
+        cell_selection = args.cell_selection or config.get('cell_selection')
+        if cell_selection:
+            selection_path = Path(cell_selection).expanduser()
+            if not selection_path.is_absolute():
+                selection_path = base / selection_path
+            command += ['--cell_selection', os.path.abspath(os.fspath(selection_path))]
         for value, flag in ((args.annotations, '--annotations'), (args.image_root, '--image_root')):
             if value:
                 command += [flag, str(Path(value).expanduser().resolve())]
@@ -217,6 +223,7 @@ def parse_args(argv=None):
     dataset.add_argument('--image-root', help='Thu muc anh neu khac cau truc mac dinh.')
     dataset.add_argument('--raf-images', choices=('auto', 'aligned', 'original'), default=None)
     dataset.add_argument('--affectnet-classes', type=int, choices=(7, 8), default=None)
+    dataset.add_argument('--cell-selection', help='Ghi de file audited rare-cell allowlist trong config.')
     dataset.add_argument('--inspect', action='store_true', help='Kiem tra dataset, khong can GPU hay tai weights.')
     dataset.add_argument('--prepared-only', action='store_true', help='Chi nhan anh da co background/pose.')
     dataset.add_argument('--preprocess-python', help='Python da cai requirements-preprocess.txt; mac dinh Python hien tai.')

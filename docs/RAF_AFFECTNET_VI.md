@@ -11,41 +11,48 @@ Sau khi cài môi trường theo [QUICKSTART_VI.md](QUICKSTART_VI.md), cài thê
 chấm AU theo [DATASET_VI.md](DATASET_VI.md#1-cài-môi-trường-một-lần).
 
 ```bash
-# RAF-DB: chỉ đọc test split, chưa tải model hay dùng GPU
-python run_magicface.py dataset /data/RAF-DB \
-  --dataset-type rafdb --split test --inspect
+# RAF-DB Anger rare cells: đọc train allowlist, chưa tải model hay dùng GPU
+python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 --inspect
 
-# Smoke test 8 ảnh; explicit --limit cho phép chạy dưới minimum 50 của config
-python run_magicface.py dataset /data/RAF-DB \
-  --dataset-type rafdb --split test --limit 8 --output runs/rafdb_test_8
+# Smoke test 3 audited cell-source pairs -> 15 outputs
+python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 \
+  --limit 3 --no-au --output runs/rafdb_anger_cells_smoke
 
-# AffectNet: đọc validation split, chưa chạy model
-python run_magicface.py dataset /data/AffectNet \
-  --dataset-type affectnet --split val --inspect
-
-python run_magicface.py dataset /data/AffectNet \
-  --dataset-type affectnet --split val --limit 8 --output runs/affectnet_val_8
+# Run đầy đủ 5 cells / 38 cell-source pairs -> 190 outputs
+python run_magicface.py dataset /data/RAF-DB/basic/Image/aligned_224 \
+  --no-au --output runs/rafdb_anger_cells_magicface
 ```
 
-Run đánh giá chính theo config mặc định:
-
-```bash
-python run_magicface.py dataset /data/RAF-DB \
-  --dataset-type rafdb --split test --output runs/rafdb_single_au_50
-```
-
-Lệnh này chọn 50 ảnh test và tạo 850 output: một zero-edit baseline cùng 16
-single-AU conditions trên mỗi ảnh. Không condition nào bật đồng thời hai AU.
+Config mặc định chỉ dùng Anger train sources trong audited allowlist. Không condition
+nào bật đồng thời hai AU; mỗi cell chỉ thêm x = AU5 hoặc AU25.
 
 Thay `/data/...` bằng đường dẫn thật. `--split` được áp dụng **trước** `--limit`.
-Config mặc định chọn 50 ảnh và yêu cầu tìm đủ 50. Khi truyền `--limit 8`, CLI coi
-đó là smoke test chủ động và bỏ minimum 50; có thể đặt lại bằng `--min-images`.
-Chọn `--split train` nếu dùng ảnh train; mặc định là `all` nếu không truyền split.
-RAF-DB Basic có train/test, không tự tạo val.
-AffectNet CSV gốc có training/validation; bản repack có test chỉ được nhận nếu
-thư mục/annotation của bản đó thực sự có test, không coi val là test.
+Selection xảy ra trước `--limit`. Default config ép RAF-DB train vì danh sách nguồn
+đã audit đều là train IDs. Không dùng validation/test để chọn source, liều hoặc seed.
 
 ## RAF-DB Basic
+
+### Audited rare Anger selection
+
+Default config chỉ dùng 5 cells đã qua R1–R7, R8 và R10 trong snapshot
+`configs/anger_cells_magicface.json`:
+
+- `4+25 → +AU5`: 15 nguồn aligned.
+- `4+17 → +AU5`: 7 nguồn.
+- `4+17 → +AU25`: 6 nguồn.
+- `25 → +AU5`: 6 nguồn.
+- `17 → +AU5`: 4 nguồn; giữ nguyên cảnh báo thiếu một nguồn so với R5.
+
+Tổng cộng 38 cell-source pairs / 32 source IDs duy nhất. Đây là giới hạn bằng
+evidence hiện có, nên pipeline không lấy thêm ảnh ngẫu nhiên để đủ 50. Snapshot
+ghi SHA-256 của `cells_anger.json`; `dataset_inputs.json` và run config lưu SHA
+của chính allowlist đã dùng.
+
+`selection_status=prequalified_R1_R8_R10` chỉ nói source/cell đủ điều kiện để
+thử gen. Nó **không** nói ảnh output hợp lệ. Cho tới khi có OpenGraphAU gate
+(1)(2), AUCANet gate (3″) và dlib identity gate (4), output được ghi rõ
+`acceptance_status=not_evaluated_requires_gates_1_2_3_4` và không nên đưa vào
+training như ảnh T1/T2.
 
 ```text
 RAF-DB/

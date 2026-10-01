@@ -20,7 +20,8 @@ CASE_METADATA_FIELDS = ('label', 'requested_aus', 'seed', 'inference_steps', 'fe
                         'sample_id', 'dataset_id', 'input_source', 'dataset_metadata',
                         'background', 'generation_seconds', 'dataset_name', 'dataset_split',
                         'source_emotion', 'source_valence', 'source_arousal', 'edit_type',
-                        'active_aus', 'edit_au', 'edit_level')
+                        'active_aus', 'edit_au', 'edit_level', 'cell_id', 'cell_A',
+                        'target_au', 'control_aus', 'selection_status', 'acceptance_status')
 
 
 def add_report_arguments(parser):
@@ -215,7 +216,8 @@ def _write_html(report, output_dir):
                         f'{esc(dataset_counts.get("images_with_output", "N/A"))} images with output; '
                         f'{esc(dataset_counts.get("generated_edits", "N/A"))} generated edits; '
                         f'{esc(dataset_counts.get("failed_events", "N/A"))} input/preprocessing/generation failure events.</p>')
-    for name in ('dataset_summary.json', 'samples.csv', 'failures.csv', 'excluded_annotations.csv'):
+    for name in ('dataset_summary.json', 'dataset_inputs.json', 'cell_selection.json',
+                 'samples.csv', 'failures.csv', 'excluded_annotations.csv'):
         if (output_dir / name).is_file():
             links += f' <a href="{name}">{name}</a>'
     evidence_html = ''
@@ -326,7 +328,8 @@ def write_verification_report(cases, output_dir, scores=None, au_delta_scale=Non
     (output_dir / 'results.json').write_text(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
     fields = ['case', 'sample_id', 'dataset_id', 'dataset_name', 'dataset_split', 'source_emotion',
               'source_valence', 'source_arousal', 'label', 'source', 'result', 'seed', 'inference_steps',
-              'generation_seconds', 'edit_type', 'edit_au', 'edit_level', 'status', 'au',
+              'generation_seconds', 'cell_id', 'cell_A', 'target_au', 'control_aus',
+              'selection_status', 'acceptance_status', 'edit_type', 'edit_au', 'edit_level', 'status', 'au',
               'requested_delta', 'source_intensity', 'result_intensity', 'measured_delta',
               'expected_delta', 'absolute_error', 'target_out_of_range', 'edited_au_mae', 'unchanged_au_drift']
     with (output_dir / 'scores.csv').open('w', newline='', encoding='utf-8') as stream:

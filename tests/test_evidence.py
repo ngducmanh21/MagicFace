@@ -91,6 +91,24 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(au1_zero['n_total'], 1)
         self.assertEqual(au4_zero['n_total'], 1)
 
+    def test_rare_cell_response_is_kept_separate_by_A_configuration(self):
+        metadata = {'cell_A': ['AU4', 'AU25'], 'target_au': 'AU5', 'n_A': 34,
+                    'n_Ax_exact': 3, 'selection_status': 'prequalified_R1_R8_R10',
+                    'acceptance_status': 'not_evaluated_requires_gates_1_2_3_4'}
+        baseline = {**self.cases[0], 'cell_id': 'anger_4_25_au5', 'target_au': 'AU5',
+                    'source_emotion': 'anger', 'dataset_metadata': metadata,
+                    'requested_aus': {'AU5': 0}}
+        edit = {**self.cases[1], 'cell_id': 'anger_4_25_au5', 'target_au': 'AU5',
+                'source_emotion': 'anger', 'dataset_metadata': metadata,
+                'requested_aus': {'AU5': 2}}
+        summary = summarize_evidence(write_verification_report(
+            [baseline, edit], self.root / 'cell', scores=self.scores))
+        self.assertEqual(summary['rare_cell_summary'][0]['cell_id'], 'anger_4_25_au5')
+        self.assertEqual(summary['rare_cell_summary'][0]['unique_sources'], 1)
+        self.assertEqual([row['requested_delta'] for row in summary['rare_cell_response']], [0.0, 2.0])
+        self.assertTrue(all(row['acceptance_status'].startswith('not_evaluated')
+                            for row in summary['rare_cell_response']))
+
     def test_conflicting_annotations_rejected_even_across_source_result_roles(self):
         cases = [dict(case) for case in self.cases]
         cases[1]['fer'] = {**cases[1]['fer'], 'source_true': 'different_label'}

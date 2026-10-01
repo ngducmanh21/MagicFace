@@ -42,12 +42,18 @@ def prepare(items, output, assets):
         preprocess = preprocess_module
 
     results = {}
+    prepared_by_source = {}
     for index, item in enumerate(items):
         print(f'Preparing {index + 1}/{len(items)}: {item["id"]}', flush=True)
         directory = output / item['key']
         directory.mkdir(parents=True, exist_ok=True)
         source, background = directory / 'source.png', directory / 'background.png'
         try:
+            cache_key = (str(Path(item['source']).resolve()), aligned_input(item))
+            if cache_key in prepared_by_source:
+                results[item['id']] = {**prepared_by_source[cache_key], 'reused_preprocessing': True}
+                print(f'Reused prepared source for {item["id"]}', flush=True)
+                continue
             if aligned_input(item):
                 prepare_aligned_source(item['source'], source)
             else:
@@ -64,6 +70,7 @@ def prepare(items, output, assets):
                     if image.size != (512, 512):
                         raise ValueError(f'Unexpected prepared image size: {image.size}')
             results[item['id']] = {'status': 'ok', 'source': str(source), 'background': str(background)}
+            prepared_by_source[cache_key] = results[item['id']]
         except Exception as exc:
             results[item['id']] = {'status': 'error', 'error': f'{type(exc).__name__}: {exc}'}
             print(f'Failed {item["id"]}: {results[item["id"]]["error"]}', file=sys.stderr, flush=True)

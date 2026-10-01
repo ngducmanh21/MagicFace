@@ -14,6 +14,7 @@ from types import SimpleNamespace
 
 from inference import generate_edits, load_pipeline, model_metadata
 from mgface.au import edit_metadata, parse_au_request
+from mgface.cell_selection import apply_cell_selection
 from mgface.dataset_inputs import discover_dataset, inspect_item, item_key
 from mgface.verification import add_report_arguments, report_from_args, validate_scale
 
@@ -32,6 +33,8 @@ def plan_dataset(args):
     dataset = discover_dataset(args.dataset, exclude_dir=args.output_dir, dataset_type=args.dataset_type,
                                split=args.split, annotations=args.annotations, image_root=args.image_root,
                                raf_images=args.raf_images, affectnet_classes=args.affectnet_classes)
+    if args.cell_selection:
+        dataset = apply_cell_selection(dataset, args.cell_selection, args.au_requests)
     selected = dataset['items'][:args.limit] if args.limit else dataset['items']
     if args.min_images and len(selected) < args.min_images:
         raise ValueError(f'Experiment requires at least {args.min_images} selected images, found {len(selected)}.')
@@ -97,9 +100,12 @@ def _csv(path, rows, fields):
 def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
                     preparer=prepare_raw_images, reporter=report_from_args):
     dataset, selected, ready, raw, errors = plan_dataset(args)
+    request_counts = [len(item.get('generation_requests', args.au_requests)) for item in selected]
     counts = {'dataset_images': len(dataset['items']), 'selected_images': len(selected),
               'prepared_inputs': len(ready), 'raw_inputs': len(raw), 'invalid_inputs': len(errors),
-              'edits_per_image': len(args.au_requests), 'planned_edits': len(selected) * len(args.au_requests),
+              'edits_per_image': request_counts[0] if len(set(request_counts)) == 1 else None,
+              'planned_edits': sum(request_counts),
+              'unique_selected_sources': len({item['source'] for item in selected}),
               'minimum_images': args.min_images}
     counts.update(dataset_kind=dataset['kind'], excluded_annotations=len(dataset.get('excluded_annotations', [])),
                   selected_class_counts=dict(Counter(item['fer'].get('source_true') or 'unlabeled' for item in selected)),
@@ -133,6 +139,9 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
         'prompt_fixed': metadata['prompt'],
     }
     write_json(output / 'dataset_inputs.json', {**dataset, 'items': selected})
+    if args.cell_selection:
+        write_json(output / 'cell_selection.json',
+                   json.loads(Path(args.cell_selection).read_text(encoding='utf-8')))
     _csv(output / 'excluded_annotations.csv', dataset.get('excluded_annotations', []),
          ['annotation', 'sample', 'split', 'reason'])
 
@@ -186,6 +195,7 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
             job = SimpleNamespace(**vars(args))
             job.img_path, job.bg_path = item['source'], item['background']
             job.saved_path = str(output / 'generated' / item_key(item))
+            job.au_requests = item.get('generation_requests', args.au_requests)
 
             def on_case(case, variant_index):
                 for key, value in edit_metadata(case['requested_aus']).items():
@@ -198,6 +208,12 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
                             source_emotion=item['fer'].get('source_true'),
                             source_valence=item['metadata'].get('valence'),
                             source_arousal=item['metadata'].get('arousal'))
+                case.update(cell_id=item['metadata'].get('cell_id'),
+                            cell_A=item['metadata'].get('cell_A'),
+                            target_au=item['metadata'].get('target_au'),
+                            control_aus=item['metadata'].get('control_aus'),
+                            selection_status=item['metadata'].get('selection_status'),
+                            acceptance_status=item['metadata'].get('acceptance_status'))
                 case['label'] = f"{item['id']} / {case['label']}"
                 cases.append(case)
                 done_ids.add(item['id'])
@@ -226,7 +242,8 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
     _csv(output / 'samples.csv', cases, ['sample_id', 'dataset_id', 'input_source', 'source', 'background',
                                         'result', 'requested_aus', 'seed', 'inference_steps', 'generation_seconds',
                                         'edit_type', 'edit_au', 'edit_level', 'dataset_name', 'dataset_split',
-                                        'source_emotion', 'source_valence', 'source_arousal'])
+                                        'source_emotion', 'source_valence', 'source_arousal', 'cell_id',
+                                        'cell_A', 'target_au', 'control_aus', 'selection_status', 'acceptance_status'])
     _csv(output / 'failures.csv', errors, ['dataset_id', 'source', 'stage', 'error'])
     metadata['dataset_counts'] = {**counts, 'images_with_output': len(done_ids),
                                   'generated_edits': len(cases), 'failed_events': len(errors)}
@@ -254,6 +271,7 @@ def parse_args(argv=None):
     parser.add_argument('--image_root', help='Directory relative to which annotation image paths are resolved.')
     parser.add_argument('--raf_images', choices=('auto', 'aligned', 'original'), default='auto')
     parser.add_argument('--affectnet_classes', type=int, choices=(7, 8), default=8)
+    parser.add_argument('--cell_selection', help='Audited rare-cell allowlist; filters sources before --limit.')
     parser.add_argument('--output_dir', required=True)
     parser.add_argument('--au_test', default='AU4+AU1')
     parser.add_argument('--AU_variation', action='append')

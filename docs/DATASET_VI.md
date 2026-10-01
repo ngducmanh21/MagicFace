@@ -60,11 +60,12 @@ dự kiến. `--dry-run` chỉ in lệnh; `--inspect` thực sự đọc/kiểm 
 Thử với ảnh mẫu đã có trong repo:
 
 ```bash
-python run_magicface.py dataset test_images --limit 3 --inspect
+python run_magicface.py dataset test_images \
+  --config configs/inference_demo.json --limit 3 --inspect
 ```
 
-Với config sweep mới, kết quả mong đợi là **3 ảnh gốc + 3 background, dự kiến
-51 ảnh sinh**. `--limit 3` đánh dấu đây là smoke test dưới minimum 50.
+Kết quả mong đợi là **3 ảnh gốc + 3 background, dự kiến 9 ảnh sinh**. Config
+demo này chỉ để kiểm tra plumbing; run Anger chính dùng audited default config.
 
 ## 3. Chạy dataset
 
@@ -80,8 +81,8 @@ Chạy toàn bộ:
 python run_magicface.py dataset /duong/dan/dataset --output runs/dataset_full
 ```
 
-`--limit` tính theo **ảnh đầu vào**, không phải số edit. Config mặc định dùng 50
-ảnh và minimum 50; explicit `--limit 8` là smoke test và tự bỏ minimum đó.
+`--limit` tính theo **cell-source pair** sau bước audited selection khi config có
+`cell_selection`; explicit `--limit 8` là smoke test 8 pair đầu tiên.
 Bỏ `--output` thì CLI
 tạo thư mục mới dưới `runs/`, mang tên dataset và timestamp UTC. Thư mục output
 phải mới/rỗng để không trộn kết quả của các lần chạy.
@@ -179,6 +180,7 @@ runs/dataset_full/
   scores.csv                  # một dòng mỗi ảnh sinh × mỗi AU
   results.json                # số đo đầy đủ + metadata từng sample
   dataset_inputs.json         # snapshot danh sách input đã chọn
+  cell_selection.json         # snapshot audited rare-cell allowlist nếu dùng
   dataset_summary.json        # số lượng, trạng thái, thời gian, thông số chạy
   generation_manifest.json    # dùng chấm lại AU mà không sinh lại ảnh
   failures.csv / failures.json
@@ -201,10 +203,13 @@ thành công/chưa sinh và lỗi. Config sửa tại [configs/dataset_demo.json
 python run_magicface.py dataset /duong/dan/dataset --config configs/dataset_demo.json
 ```
 
-Config mặc định tạo 17 conditions trên mỗi ảnh: một `zero_baseline`, rồi từng
-AU1/AU4/AU6/AU12 riêng lẻ ở mức +1, +2, +3, +4. Với 50 ảnh là 850 outputs.
+Config mặc định đọc allowlist `anger_cells_magicface.json`: 5 rare Anger cells,
+38 cell-source pairs từ 32 nguồn train duy nhất. Mỗi pair có một `zero_baseline`
+và target AU5 hoặc AU25 riêng lẻ ở mức +1…+4, tổng 190 outputs.
 `single_au_only` và `require_zero_baseline` khiến CLI từ chối config vô tình ghép
 nhiều AU hoặc thiếu/thừa baseline. Seed, prompt và inference steps giữ cố định.
+Không tự bù lên 50 bằng ảnh ngoài rule. Muốn mở rộng emotion/cell phải tạo allowlist
+mới qua cùng R1–R10, không dùng thứ tự ảnh hoặc sampling ngẫu nhiên.
 
 Giá trị source/result là AU đo thực tế; tham số request chỉ là điều kiện đầu vào.
 Thiếu score được để `N/A`, không thay bằng 0. Chưa hiệu chuẩn thang AU thì giữ
