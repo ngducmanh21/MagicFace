@@ -206,7 +206,7 @@ class NativeDatasetTests(unittest.TestCase):
         root, labels = self.raf()
         _, args = cli_args(['dataset', str(root), '--dataset-type', 'rafdb', '--split', 'test',
                             '--annotations', str(labels), '--image-root', str(root / 'Image/original'),
-                            '--raf-images', 'original', '--inspect'])
+                            '--raf-images', 'original', '--limit', '1', '--inspect'])
         command, _ = build_command(args)
         self.assertIn('--annotations', command)
         parsed = parse_args(command[2:])

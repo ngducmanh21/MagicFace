@@ -60,10 +60,11 @@ dự kiến. `--dry-run` chỉ in lệnh; `--inspect` thực sự đọc/kiểm 
 Thử với ảnh mẫu đã có trong repo:
 
 ```bash
-python run_magicface.py dataset test_images --inspect
+python run_magicface.py dataset test_images --limit 3 --inspect
 ```
 
-Kết quả mong đợi: **3 ảnh gốc + 3 background, dự kiến 9 ảnh sinh**.
+Với config sweep mới, kết quả mong đợi là **3 ảnh gốc + 3 background, dự kiến
+51 ảnh sinh**. `--limit 3` đánh dấu đây là smoke test dưới minimum 50.
 
 ## 3. Chạy dataset
 
@@ -79,7 +80,9 @@ Chạy toàn bộ:
 python run_magicface.py dataset /duong/dan/dataset --output runs/dataset_full
 ```
 
-`--limit` tính theo **ảnh đầu vào**, không phải số edit. Bỏ `--output` thì CLI
+`--limit` tính theo **ảnh đầu vào**, không phải số edit. Config mặc định dùng 50
+ảnh và minimum 50; explicit `--limit 8` là smoke test và tự bỏ minimum đó.
+Bỏ `--output` thì CLI
 tạo thư mục mới dưới `runs/`, mang tên dataset và timestamp UTC. Thư mục output
 phải mới/rỗng để không trộn kết quả của các lần chạy.
 
@@ -197,6 +200,11 @@ thành công/chưa sinh và lỗi. Config sửa tại [configs/dataset_demo.json
 ```bash
 python run_magicface.py dataset /duong/dan/dataset --config configs/dataset_demo.json
 ```
+
+Config mặc định tạo 17 conditions trên mỗi ảnh: một `zero_baseline`, rồi từng
+AU1/AU4/AU6/AU12 riêng lẻ ở mức +1, +2, +3, +4. Với 50 ảnh là 850 outputs.
+`single_au_only` và `require_zero_baseline` khiến CLI từ chối config vô tình ghép
+nhiều AU hoặc thiếu/thừa baseline. Seed, prompt và inference steps giữ cố định.
 
 Giá trị source/result là AU đo thực tế; tham số request chỉ là điều kiện đầu vào.
 Thiếu score được để `N/A`, không thay bằng 0. Chưa hiệu chuẩn thang AU thì giữ

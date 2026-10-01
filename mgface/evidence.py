@@ -96,10 +96,13 @@ def summarize_evidence(report):
                            'change_mean': _average([r['measured_delta'] for r in rows]),
                            'edited_mae': _average([r['absolute_error'] for r in edited if r['absolute_error'] is not None]),
                            'unchanged_drift': _average([abs(r['measured_delta']) for r in unchanged])})
-        # Include explicitly requested zero controls; do not add implicit zeros to sweeps.
-        controls = sorted({case['requested_aus'][name] for case in cases if name in case['requested_aus']})
+        # Zero response comes only from the zero-edit baseline. Cases editing a
+        # different AU are cross-talk observations, not baseline replicates.
+        eligible = [case for case in cases if case.get('edit_type') == 'zero_baseline'
+                    or case['requested_aus'].get(name, 0) != 0]
+        controls = sorted({case['requested_aus'].get(name, 0.0) for case in eligible})
         for control in controls:
-            selected = [case for case in cases if case['requested_aus'].get(name) == control]
+            selected = [case for case in eligible if case['requested_aus'].get(name, 0.0) == control]
             measurements = [r['measured_delta'] for case in selected for r in case['au_rows']
                             if r['au'] == name and r['measured_delta'] is not None]
             stats = _stats(measurements)
@@ -143,7 +146,7 @@ def summarize_evidence(report):
             'scoring_failures': [{'reason': reason, 'n_unique_images': count} for reason, count in errors.items()],
             'definitions': {
                 'au_unit': 'Paired edit case; a source repeated across edits contributes once per edit.',
-                'au_control_response': 'Pooled by AU and requested value, including combination edits; descriptive, not an isolated causal effect.',
+                'au_control_response': 'Zero uses only zero-edit baselines; nonzero points include cases where that AU is active. Combination edits remain descriptive.',
                 'au_error': 'Computed only with explicit au_delta_scale. Missing scores excluded, never imputed as zero.',
                 'fer_unit': 'Unique image path within source/result; identical image annotations are deduplicated.',
                 'fer_ground_truth': 'Provided source_true/result_true annotations; requested target emotion is not ground truth.',

@@ -10,6 +10,7 @@ rồi bỏ `--inspect` để sinh ảnh và xuất report chung.
 
 **RAF-DB và AffectNet:** [TXT/CSV/NPY/class folders, mapping và split](docs/RAF_AFFECTNET_VI.md).
 Ví dụ: `python run_magicface.py dataset /data/RAF-DB --dataset-type rafdb --split test --inspect`.
+Config dataset mặc định chạy 50 ảnh với zero baseline và sweep riêng AU1/AU4/AU6/AU12 ở mức +1…+4.
 
 > **MagicFace: High-Fidelity Facial Expression Editing with Action-Unit Control** [[arXiv paper](http://arxiv.org/abs/2501.02260)]<br>
 > Mengting Wei, Tuomas Varanka, Xingxun Jiang, Huai-Qian Khor, Guoying Zhao<br>

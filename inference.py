@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 from PIL import Image
-from mgface.au import AU_NAMES, parse_au_request
+from mgface.au import AU_NAMES, edit_metadata, parse_au_request
 from mgface.verification import add_report_arguments, report_from_args, validate_scale
 
 # AU mapping
@@ -253,11 +253,14 @@ def generate_edits(args, pipeline, prompt_embeds, images=None, on_case=None):
         if result_path.resolve() in (image_path.resolve(), Path(args.bg_path).resolve()):
             raise ValueError('--saved_path would overwrite an input image. Choose another directory.')
         sample.save(result_path)
-        label = ', '.join(f'{name} {value:+g}' for name, value in requested.items())
+        edit = edit_metadata(requested)
+        label = ('zero-edit baseline' if edit['edit_type'] == 'zero_baseline' else
+                 ', '.join(f'{name} {requested[name]:+g}' for name in edit['active_aus']))
         cases.append({'source': str(image_path.resolve()), 'result': str(result_path.resolve()),
                       'requested_aus': requested, 'label': label, 'seed': args.seed,
                       'inference_steps': args.inference_steps,
-                      'generation_seconds': elapsed, 'background': str(Path(args.bg_path).resolve())})
+                      'generation_seconds': elapsed, 'background': str(Path(args.bg_path).resolve()),
+                      **edit})
         print(f'Saved {label}: {result_path}')
         if on_case is not None:
             on_case(cases[-1], index)

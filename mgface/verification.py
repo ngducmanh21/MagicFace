@@ -13,13 +13,14 @@ import tempfile
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
-from .au import AU_NAMES, validate_request
+from .au import AU_NAMES, edit_metadata, validate_request
 from .evidence import validate_fer_annotations
 
 CASE_METADATA_FIELDS = ('label', 'requested_aus', 'seed', 'inference_steps', 'fer',
                         'sample_id', 'dataset_id', 'input_source', 'dataset_metadata',
                         'background', 'generation_seconds', 'dataset_name', 'dataset_split',
-                        'source_emotion', 'source_valence', 'source_arousal')
+                        'source_emotion', 'source_valence', 'source_arousal', 'edit_type',
+                        'active_aus', 'edit_au', 'edit_level')
 
 
 def add_report_arguments(parser):
@@ -46,6 +47,8 @@ def validate_cases(cases):
     for case in cases:
         item = dict(case)
         item['requested_aus'] = validate_request(case['requested_aus'])
+        for key, value in edit_metadata(item['requested_aus']).items():
+            item.setdefault(key, value)
         for key in ('source', 'result'):
             path = Path(case[key]).resolve()
             with Image.open(path) as image:
@@ -323,7 +326,7 @@ def write_verification_report(cases, output_dir, scores=None, au_delta_scale=Non
     (output_dir / 'results.json').write_text(json.dumps(report, indent=2, ensure_ascii=False, allow_nan=False))
     fields = ['case', 'sample_id', 'dataset_id', 'dataset_name', 'dataset_split', 'source_emotion',
               'source_valence', 'source_arousal', 'label', 'source', 'result', 'seed', 'inference_steps',
-              'generation_seconds', 'status', 'au',
+              'generation_seconds', 'edit_type', 'edit_au', 'edit_level', 'status', 'au',
               'requested_delta', 'source_intensity', 'result_intensity', 'measured_delta',
               'expected_delta', 'absolute_error', 'target_out_of_range', 'edited_au_mae', 'unchanged_au_drift']
     with (output_dir / 'scores.csv').open('w', newline='', encoding='utf-8') as stream:

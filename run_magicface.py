@@ -18,7 +18,9 @@ from mgface.au import parse_au_request
 ROOT = Path(__file__).resolve().parent
 CONFIG_KEYS = {'image', 'background', 'output_dir', 'aus', 'variations', 'seed',
                'inference_steps', 'title', 'au_python', 'au_backend', 'au_device',
-               'au_delta_scale', 'figure_formats', 'base_model', 'id_model', 'denoising_model'}
+               'au_delta_scale', 'figure_formats', 'base_model', 'id_model', 'denoising_model',
+               'limit', 'min_images', 'dataset_type', 'split', 'raf_images',
+               'affectnet_classes', 'single_au_only', 'require_zero_baseline'}
 
 
 def resolve_path(value, base):
@@ -101,8 +103,6 @@ def build_command(args):
         dataset = Path(args.path).expanduser().resolve()
         if not dataset.exists():
             raise ValueError(f'Khong tim thay dataset: {dataset}')
-        if args.limit < 0:
-            raise ValueError('--limit phai >= 0.')
         default_output = ROOT / 'runs' / (dataset.stem + '_' + datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S_%f'))
     else:
         image, background = (resolve_path(config[key], base) for key in ('image', 'background'))
@@ -121,6 +121,7 @@ def build_command(args):
         raise ValueError('variations phai la danh sach khong rong.')
     names = '+'.join(aus)
     changes = []
+    requests = []
     for values in variations:
         if not isinstance(values, list) or len(values) != len(aus):
             raise ValueError('Moi dong variations phai co dung mot gia tri cho moi AU.')
@@ -128,8 +129,18 @@ def build_command(args):
             raise ValueError('Gia tri AU phai la so.')
         # Fixed-point formatting keeps '+' in scientific exponents out of the AU delimiter.
         serialized = '+'.join(format(Decimal(str(v)), 'f') for v in values)
-        parse_au_request(names, serialized)
+        requests.append(parse_au_request(names, serialized))
         changes.append(f'--AU_variation={serialized}')
+    if len({tuple(request[name] for name in aus) for request in requests}) != len(requests):
+        raise ValueError('variations khong duoc trung nhau.')
+    if config.get('require_zero_baseline', False):
+        baselines = sum(all(value == 0 for value in request.values()) for request in requests)
+        if baselines != 1:
+            raise ValueError('Config yeu cau dung mot zero-edit baseline.')
+    if config.get('single_au_only', False):
+        invalid = [request for request in requests if sum(value != 0 for value in request.values()) > 1]
+        if invalid:
+            raise ValueError(f'single_au_only cam AU combinations: {invalid[0]}')
     seed, steps = config.get('seed', 424), config.get('inference_steps', 50)
     if type(seed) is not int or not 0 <= seed < 2**63:
         raise ValueError('seed phai la so nguyen trong [0, 2**63).')
@@ -144,11 +155,22 @@ def build_command(args):
                              config.get('figure_formats', ['png', 'svg', 'pdf']),
                              config.get('au_delta_scale'))
     if is_dataset:
+        explicit_limit = args.limit is not None
+        limit = args.limit if explicit_limit else config.get('limit', 0)
+        min_images = (args.min_images if args.min_images is not None else
+                      0 if explicit_limit else config.get('min_images', 0))
+        dataset_type = args.dataset_type or config.get('dataset_type', 'auto')
+        split = args.split or config.get('split', 'all')
+        raf_images = args.raf_images or config.get('raf_images', 'auto')
+        affectnet_classes = (args.affectnet_classes if args.affectnet_classes is not None
+                             else config.get('affectnet_classes', 8))
+        if limit < 0 or min_images < 0:
+            raise ValueError('--limit va --min-images phai >= 0.')
         command = [sys.executable, str(ROOT / 'inference_dataset.py'), '--dataset', str(dataset),
-                   '--output_dir', str(output), '--limit', str(args.limit),
+                   '--output_dir', str(output), '--limit', str(limit), '--min_images', str(min_images),
                    '--preprocess_python', python_path(args.preprocess_python, Path.cwd()),
-                   '--dataset_type', args.dataset_type, '--split', args.split,
-                   '--raf_images', args.raf_images, '--affectnet_classes', str(args.affectnet_classes)]
+                   '--dataset_type', dataset_type, '--split', split,
+                   '--raf_images', raf_images, '--affectnet_classes', str(affectnet_classes)]
         for value, flag in ((args.annotations, '--annotations'), (args.image_root, '--image_root')):
             if value:
                 command += [flag, str(Path(value).expanduser().resolve())]
@@ -187,13 +209,14 @@ def parse_args(argv=None):
     dataset.add_argument('path', help='Thu muc anh, dataset.json hoac dataset.csv.')
     dataset.add_argument('--config', default=str(ROOT / 'configs/dataset_demo.json'))
     dataset.add_argument('--output', help='Thu muc output moi; mac dinh tao run theo ten dataset + timestamp.')
-    dataset.add_argument('--limit', type=int, default=0, help='So anh toi da; 0 = tat ca.')
-    dataset.add_argument('--dataset-type', choices=('auto', 'generic', 'rafdb', 'affectnet'), default='auto')
-    dataset.add_argument('--split', choices=('all', 'train', 'val', 'test'), default='all', help='Loc split truoc khi ap dung --limit.')
+    dataset.add_argument('--limit', type=int, default=None, help='Ghi de so anh trong config; 0 = tat ca.')
+    dataset.add_argument('--min-images', type=int, default=None, help='Ghi de so anh toi thieu; explicit --limit tu dong cho phep smoke test nho.')
+    dataset.add_argument('--dataset-type', choices=('auto', 'generic', 'rafdb', 'affectnet'), default=None)
+    dataset.add_argument('--split', choices=('all', 'train', 'val', 'test'), default=None, help='Loc split truoc khi ap dung --limit.')
     dataset.add_argument('--annotations', help='File nhan goc neu khong nam dung vi tri mac dinh.')
     dataset.add_argument('--image-root', help='Thu muc anh neu khac cau truc mac dinh.')
-    dataset.add_argument('--raf-images', choices=('auto', 'aligned', 'original'), default='auto')
-    dataset.add_argument('--affectnet-classes', type=int, choices=(7, 8), default=8)
+    dataset.add_argument('--raf-images', choices=('auto', 'aligned', 'original'), default=None)
+    dataset.add_argument('--affectnet-classes', type=int, choices=(7, 8), default=None)
     dataset.add_argument('--inspect', action='store_true', help='Kiem tra dataset, khong can GPU hay tai weights.')
     dataset.add_argument('--prepared-only', action='store_true', help='Chi nhan anh da co background/pose.')
     dataset.add_argument('--preprocess-python', help='Python da cai requirements-preprocess.txt; mac dinh Python hien tai.')

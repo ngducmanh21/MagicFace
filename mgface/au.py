@@ -6,6 +6,18 @@ import math
 AU_NAMES = tuple(f"AU{i}" for i in (1, 2, 4, 5, 6, 9, 12, 15, 17, 20, 25, 26))
 
 
+def edit_metadata(values):
+    """Describe an AU request for stable filenames, tables and fair grouping."""
+    active = [name for name, value in values.items() if float(value) != 0]
+    if not active:
+        return {'edit_type': 'zero_baseline', 'active_aus': [], 'edit_au': None, 'edit_level': 0.0}
+    if len(active) == 1:
+        name = active[0]
+        return {'edit_type': 'single_au', 'active_aus': active,
+                'edit_au': name, 'edit_level': float(values[name])}
+    return {'edit_type': 'combination', 'active_aus': active, 'edit_au': None, 'edit_level': None}
+
+
 def validate_request(values):
     if not isinstance(values, dict) or not values:
         raise ValueError("requested_aus must be a non-empty mapping, e.g. {'AU4': 2}.")

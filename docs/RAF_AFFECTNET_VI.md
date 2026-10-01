@@ -15,7 +15,7 @@ chấm AU theo [DATASET_VI.md](DATASET_VI.md#1-cài-môi-trường-một-lần).
 python run_magicface.py dataset /data/RAF-DB \
   --dataset-type rafdb --split test --inspect
 
-# Chạy thử 8 ảnh test -> 24 edit với config mặc định
+# Smoke test 8 ảnh; explicit --limit cho phép chạy dưới minimum 50 của config
 python run_magicface.py dataset /data/RAF-DB \
   --dataset-type rafdb --split test --limit 8 --output runs/rafdb_test_8
 
@@ -27,9 +27,21 @@ python run_magicface.py dataset /data/AffectNet \
   --dataset-type affectnet --split val --limit 8 --output runs/affectnet_val_8
 ```
 
+Run đánh giá chính theo config mặc định:
+
+```bash
+python run_magicface.py dataset /data/RAF-DB \
+  --dataset-type rafdb --split test --output runs/rafdb_single_au_50
+```
+
+Lệnh này chọn 50 ảnh test và tạo 850 output: một zero-edit baseline cùng 16
+single-AU conditions trên mỗi ảnh. Không condition nào bật đồng thời hai AU.
+
 Thay `/data/...` bằng đường dẫn thật. `--split` được áp dụng **trước** `--limit`.
-Bỏ `--limit` để chạy cả split. Chọn `--split train` nếu dùng ảnh train; mặc định
-là `all` nếu không truyền split. RAF-DB Basic có train/test, không tự tạo val.
+Config mặc định chọn 50 ảnh và yêu cầu tìm đủ 50. Khi truyền `--limit 8`, CLI coi
+đó là smoke test chủ động và bỏ minimum 50; có thể đặt lại bằng `--min-images`.
+Chọn `--split train` nếu dùng ảnh train; mặc định là `all` nếu không truyền split.
+RAF-DB Basic có train/test, không tự tạo val.
 AffectNet CSV gốc có training/validation; bản repack có test chỉ được nhận nếu
 thư mục/annotation của bản đó thực sự có test, không coi val là test.
 

@@ -80,6 +80,17 @@ class EvidenceTests(unittest.TestCase):
         self.assertIsNone(failed['change_mean'])
         self.assertIsNone(summary['au_control_response'][0]['change_std'])
 
+    def test_control_response_uses_only_zero_baseline_for_zero_point(self):
+        baseline = {**self.cases[0], 'requested_aus': {'AU1': 0, 'AU4': 0}}
+        au1 = {**self.cases[1], 'requested_aus': {'AU1': 1, 'AU4': 0}}
+        au4 = {**self.cases[2], 'requested_aus': {'AU1': 0, 'AU4': 1}}
+        report = write_verification_report([baseline, au1, au4], self.root / 'fair', scores=self.scores)
+        response = summarize_evidence(report)['au_control_response']
+        au1_zero = next(row for row in response if row['au'] == 'AU1' and row['requested_delta'] == 0)
+        au4_zero = next(row for row in response if row['au'] == 'AU4' and row['requested_delta'] == 0)
+        self.assertEqual(au1_zero['n_total'], 1)
+        self.assertEqual(au4_zero['n_total'], 1)
+
     def test_conflicting_annotations_rejected_even_across_source_result_roles(self):
         cases = [dict(case) for case in self.cases]
         cases[1]['fer'] = {**cases[1]['fer'], 'source_true': 'different_label'}

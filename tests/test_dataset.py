@@ -111,6 +111,7 @@ class DatasetTests(unittest.TestCase):
             samples = list(csv.DictReader(stream))
         self.assertEqual(len(samples), 6)
         self.assertEqual(len({row['result'] for row in samples}), 6)
+        self.assertTrue(all(row['edit_type'] in ('zero_baseline', 'combination') for row in samples))
         self.assertEqual(len((self.output / 'samples.jsonl').read_text().splitlines()), 6)
         _, cases, _ = load_saved_results(self.output / 'results.json')
         self.assertEqual(len({case['dataset_id'] for case in cases}), 2)
@@ -206,10 +207,11 @@ class DatasetTests(unittest.TestCase):
         self.assertIn('--dataset', command)
         self.assertEqual(output, self.output)
         result = subprocess.run([sys.executable, str(ROOT / 'run_magicface.py'), 'dataset', str(self.dataset),
-                                 '--inspect', '--output', str(self.output), '--au-python', '/missing/python'],
+                                 '--inspect', '--limit', '1', '--output', str(self.output),
+                                 '--au-python', '/missing/python'],
                                 cwd='/', capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn('"prepared_inputs": 2', result.stdout)
+        self.assertIn('"prepared_inputs": 1', result.stdout)
         self.assertFalse(self.output.exists())
 
     def test_portrait_crop_uses_bbox_height(self):

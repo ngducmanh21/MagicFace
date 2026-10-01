@@ -1,9 +1,19 @@
 {
-  "aus": ["AU4", "AU1"],
-  "variations": [[0, 0], [2, 1], [4, 2]],
+  "aus": ["AU1", "AU4", "AU6", "AU12"],
+  "variations": [
+    [0, 0, 0, 0],
+    [1, 0, 0, 0], [2, 0, 0, 0], [3, 0, 0, 0], [4, 0, 0, 0],
+    [0, 1, 0, 0], [0, 2, 0, 0], [0, 3, 0, 0], [0, 4, 0, 0],
+    [0, 0, 1, 0], [0, 0, 2, 0], [0, 0, 3, 0], [0, 0, 4, 0],
+    [0, 0, 0, 1], [0, 0, 0, 2], [0, 0, 0, 3], [0, 0, 0, 4]
+  ],
+  "single_au_only": true,
+  "require_zero_baseline": true,
+  "limit": 50,
+  "min_images": 50,
   "seed": 424,
   "inference_steps": 50,
-  "title": "MagicFace / dataset review / AU4 + AU1",
+  "title": "MagicFace / single-AU sweep / AU1 AU4 AU6 AU12 / levels 1-4",
   "au_backend": "libreface",
   "au_python": null,
   "au_device": "cpu",
