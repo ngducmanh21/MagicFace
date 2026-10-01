@@ -32,6 +32,7 @@ def apply_cell_selection(dataset, selection_path, requests, expected_sha256=None
     if expected_source_sha256 and document.get('source_sha256') != expected_source_sha256:
         raise ValueError('The vendored selection does not reference the approved _shared/cells_anger.json checksum.')
     cells = document.get('cells')
+    thresholds = document.get('og_thresholds', {})
     if not isinstance(cells, list) or not cells:
         raise ValueError('Cell selection must contain a non-empty cells list.')
     if 'anger' not in str(document.get('scope', '')).lower():
@@ -91,6 +92,7 @@ def apply_cell_selection(dataset, selection_path, requests, expected_sha256=None
                 'n_Ax_other_emotions': cell.get('n_Ax_other_emotions'),
                 'x_lift': cell.get('x_lift'), 'x_emfacs': cell.get('x_emfacs'),
                 'x_probe_auroc': cell.get('x_probe_auroc'),
+                'target_threshold_og': thresholds.get(target),
             })
             selected.append(item)
     if missing:
@@ -107,6 +109,7 @@ def apply_cell_selection(dataset, selection_path, requests, expected_sha256=None
     metadata['cell_selection'] = {
         'file': str(path), 'sha256': checksum, 'version': document.get('version'),
         'source_cells_anger_sha256': document.get('source_sha256'),
+        'source_thresholds_sha256': document.get('thresholds_source_sha256'),
         'scope': document.get('scope'), **counts,
         'pre_selection_images': len(dataset['items']),
         'random_fallback': False, 'allowed_emotions': ['anger'],

@@ -8,7 +8,7 @@
   "single_au_only": true,
   "require_zero_baseline": true,
   "cell_selection": "anger_cells_magicface.json",
-  "cell_selection_sha256": "d5db8048354ea53a2edd7c51caee0befdffc52115ee77a3c23d2b00cbca052da",
+  "cell_selection_sha256": "d70650e1ee261601eb5741d24c2c4526cc13d5aba67bf212e5e7318a8dc28bd2",
   "shared_source_sha256": "7ce3342c42d391d9a534ccfda6877eccb246c14822417f3ce82ec8c8495fc741",
   "expected_cell_count": 5,
   "expected_cell_source_pairs": 38,

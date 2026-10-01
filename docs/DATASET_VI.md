@@ -174,6 +174,8 @@ file cần dùng để tránh chọn nhầm.
 runs/dataset_full/
   report.html                 # report chung, bao gồm coverage và lỗi input
   generated/                  # ảnh sinh; tách theo ID để tránh ghi đè
+  progress_grids/             # tạo ngay sau mỗi cell-source, scores=PENDING
+  cell_grids/                 # tạo lại khi report/scoring, có LF diagnostic bars
   prepared/                   # source crop/background được tạo từ ảnh gốc
   samples.csv                 # một dòng mỗi ảnh sinh
   samples.jsonl               # ghi nối tiếp ngay sau mỗi edit thành công
@@ -220,6 +222,12 @@ Thiếu score được để `N/A`, không thay bằng 0. Chưa hiệu chuẩn t
 một số edit rồi lỗi, những edit thành công vẫn được giữ. `samples.jsonl` được ghi
 sau mỗi edit; manifest tổng được cập nhật định kỳ và khi kết thúc/bị ngắt có xử lý.
 Chưa có tự động resume; dùng thư mục output mới khi chạy lại.
+
+Với audited rare cells, mỗi `progress_grids/*.png` xuất hiện ngay sau khi source
+đã sinh xong baseline +0 và bốn liều. Sheet gồm original, control, +1…+4 và crop
+vùng AU đích. Sau LibreFace scoring, `cell_grids/*.png` thêm bar intensity 0–5,
+baseline marker và delta. Ngưỡng OpenGraphAU chỉ ghi làm reference vì khác thang;
+gate (1)(2)(3″)(4) luôn hiện `NOT EVALUATED` cho đến khi scorer chính thức được nối.
 
 ## 6. FER và dữ liệu nhãn
 

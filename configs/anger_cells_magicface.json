@@ -2,6 +2,8 @@
   "version": "2026-09-30c",
   "scope": "Anger only; audited R1-R7 + R8 + R10 cells to generate",
   "source_sha256": "7ce3342c42d391d9a534ccfda6877eccb246c14822417f3ce82ec8c8495fc741",
+  "thresholds_source_sha256": "d730a325f1f6bbd475e3bab3d9fde5b2e8ac886b8f32e6e66db94c781f66705c",
+  "og_thresholds": {"AU5": 0.5616, "AU25": 0.7822},
   "cells": [
     {
       "cell_id": "anger_4_25_au5", "emotion": "Anger", "A": "4+25", "x": "AU5",

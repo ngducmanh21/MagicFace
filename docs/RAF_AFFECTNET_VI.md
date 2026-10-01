@@ -61,6 +61,12 @@ thử gen. Nó **không** nói ảnh output hợp lệ. Cho tới khi có OpenGr
 `acceptance_status=not_evaluated_requires_gates_1_2_3_4` và không nên đưa vào
 training như ảnh T1/T2.
 
+Trong lúc generation, pipeline tạo một PNG ở `progress_grids/` sau mỗi
+cell-source. Sau bước score, report tạo bản tương ứng ở `cell_grids/` với bar
+LibreFace. Bố cục cố ý giống report kiểm chứng: original, +0 control, +1…+4,
+crop target region, rarity stats và gate badges. Badge xám nghĩa là official gate
+chưa chạy; LibreFace không thay thế OpenGraphAU trong gate (1)(2).
+
 ```text
 RAF-DB/
   EmoLabel/list_patition_label.txt

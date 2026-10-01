@@ -15,6 +15,7 @@ from types import SimpleNamespace
 from inference import generate_edits, load_pipeline, model_metadata
 from mgface.au import edit_metadata, parse_au_request
 from mgface.cell_selection import apply_cell_selection, source_id
+from mgface.cell_sheet import render_cell_sheet, cell_sheet_key
 from mgface.dataset_inputs import discover_dataset, inspect_item, item_key
 from mgface.verification import add_report_arguments, report_from_args, validate_scale
 
@@ -132,6 +133,7 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
     cases = []
     done_ids = set()
     previous_error_count = -1
+    progress_grid_count = 0
     metadata = {**model_metadata(args), 'dataset_path': dataset['path'], 'dataset_kind': dataset['kind'],
                 'dataset_metadata': dataset['metadata'], 'created_at': datetime.now(timezone.utc).isoformat(),
                 'seed': args.seed, 'inference_steps': args.inference_steps,
@@ -169,6 +171,7 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
         summary = {**counts, 'status': status, 'generated_edits': len(cases),
                    'not_generated_edits': counts['planned_edits'] - len(cases),
                    'images_with_output': len(done_ids), 'failed_events': len(errors),
+                   'progress_grids': progress_grid_count,
                    'elapsed_seconds': perf_counter() - started, 'metadata': metadata}
         write_json(output / 'dataset_summary.json', summary)
         # Avoid rewriting a large manifest after every edit; samples.jsonl is
@@ -233,6 +236,7 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
                             control_aus=item['metadata'].get('control_aus'),
                             selection_status=item['metadata'].get('selection_status'),
                             acceptance_status=item['metadata'].get('acceptance_status'))
+                case['target_threshold_og'] = item['metadata'].get('target_threshold_og')
                 case['label'] = f"{item['id']} / {case['label']}"
                 cases.append(case)
                 done_ids.add(item['id'])
@@ -240,12 +244,25 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
                     stream.write(json.dumps(case, ensure_ascii=False, allow_nan=False) + '\n')
                 save_progress('generating')
 
+            item_case_start = len(cases)
             try:
                 generator(job, pipeline, embeddings, on_case=on_case)
             except Exception as exc:
                 errors.append({'dataset_id': item['id'], 'source': item['source'],
                                'stage': 'generation', 'error': f'{type(exc).__name__}: {exc}'})
                 save_progress('generating')
+            finally:
+                item_cases = cases[item_case_start:]
+                if item_cases and item_cases[0].get('cell_id'):
+                    try:
+                        render_cell_sheet(item_cases, output / 'progress_grids' / cell_sheet_key(item_cases),
+                                          stage='generation_pending_scores')
+                        progress_grid_count += 1
+                        save_progress('generating')
+                    except Exception as exc:
+                        errors.append({'dataset_id': item['id'], 'source': item['source'],
+                                       'stage': 'progress_grid', 'error': f'{type(exc).__name__}: {exc}'})
+                        save_progress('generating')
     except BaseException as exc:
         errors.append({'dataset_id': '', 'source': '', 'stage': 'model_or_run',
                        'error': f'{type(exc).__name__}: {exc}'})

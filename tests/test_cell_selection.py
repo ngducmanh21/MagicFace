@@ -70,7 +70,7 @@ class CellSelectionTests(unittest.TestCase):
                     apply_cell_selection(self.dataset(), path, self.requests())
 
     def test_pinned_checksums_and_scope_counts_reject_drift(self):
-        expected = 'd5db8048354ea53a2edd7c51caee0befdffc52115ee77a3c23d2b00cbca052da'
+        expected = 'd70650e1ee261601eb5741d24c2c4526cc13d5aba67bf212e5e7318a8dc28bd2'
         source = '7ce3342c42d391d9a534ccfda6877eccb246c14822417f3ce82ec8c8495fc741'
         result = apply_cell_selection(
             self.dataset(), SELECTION, self.requests(), expected, source,

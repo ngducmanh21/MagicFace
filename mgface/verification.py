@@ -15,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from .au import AU_NAMES, edit_metadata, validate_request
 from .evidence import validate_fer_annotations
+from .cell_sheet import render_cell_sheets
 
 CASE_METADATA_FIELDS = ('label', 'requested_aus', 'seed', 'inference_steps', 'fer',
                         'sample_id', 'dataset_id', 'input_source', 'dataset_metadata',
@@ -22,6 +23,7 @@ CASE_METADATA_FIELDS = ('label', 'requested_aus', 'seed', 'inference_steps', 'fe
                         'source_emotion', 'source_valence', 'source_arousal', 'edit_type',
                         'active_aus', 'edit_au', 'edit_level', 'cell_id', 'cell_A',
                         'target_au', 'control_aus', 'selection_status', 'acceptance_status')
+CASE_METADATA_FIELDS += ('target_threshold_og',)
 
 
 def add_report_arguments(parser):
@@ -247,6 +249,17 @@ def _write_html(report, output_dir):
             evidence_html += ''.join(f'<a href="{path}">{Path(path).suffix[1:].upper()}</a>' for path in figure['files'])
             evidence_html += '</nav></figure>'
         evidence_html += '</div></section>'
+    cell_html = ''
+    if report.get('cell_grids'):
+        cell_html = ('<section class="evidence"><h2>Per-source rare-cell sheets</h2>'
+                     '<p>Original, generated +0 control and doses +1…+4. Bars are LibreFace diagnostics; '
+                     'official OpenGraphAU/AUCANet/dlib gates remain explicitly unevaluated.</p>'
+                     '<div class="cell-sheets">')
+        for path in report['cell_grids']:
+            cell_html += (f'<figure><a href="{esc(path)}"><img src="{esc(path)}" '
+                          f'alt="Rare cell evidence sheet" loading="lazy"></a>'
+                          f'<figcaption>{esc(Path(path).stem)}</figcaption></figure>')
+        cell_html += '</div></section>'
     document = '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AU verification</title><style>
 *{box-sizing:border-box}body{margin:0;background:#edf1f7;color:#17243b;font:15px system-ui,sans-serif}
@@ -259,6 +272,7 @@ figure{margin:0}img{width:100%;aspect-ratio:1;object-fit:contain;background:#edf
 .scores{overflow:auto}table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:14px}td,th{padding:7px;text-align:right;border-bottom:1px solid #e9edf3}td:first-child,th:first-child{text-align:left}.edited{background:#e7f6f2}
 .error{color:#a33220;overflow-wrap:anywhere}input[type=search]{padding:10px;border:1px solid #cbd5e1;border-radius:8px;width:300px;max-width:100%}label{margin-left:16px}details{margin:16px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}
 .evidence{background:white;border-radius:16px;padding:22px;margin-bottom:24px}.evidence-figures{display:grid;grid-template-columns:1fr 1fr;gap:24px}.evidence-figures img{aspect-ratio:auto;border:1px solid #dce3ed}.evidence-figures figcaption{font-weight:600;margin:14px 0}.evidence-figures nav{margin:6px 0}
+.cell-sheets{display:grid;grid-template-columns:1fr;gap:24px}.cell-sheets img{aspect-ratio:auto;border:1px solid #dce3ed}.cell-sheets figcaption{overflow-wrap:anywhere}
 @media(max-width:1000px){.comparison{grid-template-columns:1fr 1fr}.scores{grid-column:1/-1}main{padding:16px}}
 @media(max-width:700px){.evidence-figures{grid-template-columns:1fr}}
 @media print{nav,.filters{display:none}body{background:white}main{padding:0}article{border-radius:0}}
@@ -270,7 +284,7 @@ Estimator: {esc(report['estimator'])} {esc(report.get('estimator_version') or ''
 <p>Change = result intensity − source intensity. Highlighted rows are requested non-zero edits.<br>{esc(calibration)}<br>
 Unchanged AU drift is the mean absolute change of AUs requested at zero. * Expected absolute intensity outside 0–5. AU estimates are not ground truth.</p>
 <nav><a href="scores.csv">Download CSV</a><a href="results.json">Results JSON</a><a href="manifest.json">Manifest</a>{links}</nav>
-{evidence_html}<h2>Individual results</h2>
+{cell_html}{evidence_html}<h2>Individual results</h2>
 <div class="filters"><input type="search" id="search" placeholder="Filter by label or AU" aria-label="Filter results"><label><input type="checkbox" id="unscored">Unscored only</label></div>
 {''.join(cards)}<details><summary>Run metadata</summary><pre>{esc(json.dumps(report['metadata'], indent=2, ensure_ascii=False))}</pre></details></main>
 <script>function filterCards(){{const q=document.getElementById('search').value.toLowerCase();const missing=document.getElementById('unscored').checked;document.querySelectorAll('article').forEach(c=>{{c.hidden=!c.textContent.toLowerCase().includes(q)||(missing&&c.dataset.status!=='unscored')}})}}document.getElementById('search').addEventListener('input',filterCards);document.getElementById('unscored').addEventListener('change',filterCards);</script></html>'''
@@ -318,6 +332,9 @@ def write_verification_report(cases, output_dir, scores=None, au_delta_scale=Non
                                 **_evaluate(case, source, result, au_delta_scale)})
     report['scored_cases'] = sum(c['status'] == 'scored' for c in report['cases'])
     report['grids'] = _draw_sheets(report, output_dir)
+    report['cell_grids'] = [f'cell_grids/{name}' for name in render_cell_sheets(
+        report['cases'], output_dir / 'cell_grids',
+        stage='libreface_scored' if report['scored_cases'] else 'unscored')]
     if evidence:
         from .evidence import write_evidence
         report['evidence'] = write_evidence(report, output_dir, formats=figure_formats)
