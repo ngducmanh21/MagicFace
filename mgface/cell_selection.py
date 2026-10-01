@@ -21,9 +21,16 @@ def _parse_A(value):
     return result
 
 
-def apply_cell_selection(dataset, selection_path, requests):
+def apply_cell_selection(dataset, selection_path, requests, expected_sha256=None,
+                         expected_source_sha256=None, expected_counts=None):
     path = Path(selection_path).expanduser().resolve()
-    document = json.loads(path.read_text(encoding='utf-8'))
+    payload = path.read_bytes()
+    checksum = hashlib.sha256(payload).hexdigest()
+    if expected_sha256 and checksum != expected_sha256:
+        raise ValueError(f'Cell selection checksum mismatch: expected {expected_sha256}, got {checksum}')
+    document = json.loads(payload.decode('utf-8'))
+    if expected_source_sha256 and document.get('source_sha256') != expected_source_sha256:
+        raise ValueError('The vendored selection does not reference the approved _shared/cells_anger.json checksum.')
     cells = document.get('cells')
     if not isinstance(cells, list) or not cells:
         raise ValueError('Cell selection must contain a non-empty cells list.')
@@ -89,14 +96,21 @@ def apply_cell_selection(dataset, selection_path, requests):
     if missing:
         preview = ', '.join(f"{row['cell_id']}/{row['source_id']}" for row in missing[:5])
         raise ValueError(f'{len(missing)} audited cell sources are missing from the dataset: {preview}')
-    checksum = hashlib.sha256(path.read_bytes()).hexdigest()
+    counts = {'cell_count': len(cells), 'cell_source_pairs': len(selected),
+              'unique_sources': len({source_id(item['source']) for item in selected})}
+    if expected_counts:
+        mismatch = {key: (expected_counts[key], counts.get(key)) for key in expected_counts
+                    if counts.get(key) != expected_counts[key]}
+        if mismatch:
+            raise ValueError(f'Cell selection scope count mismatch: {mismatch}')
     metadata = dict(dataset.get('metadata', {}))
     metadata['cell_selection'] = {
         'file': str(path), 'sha256': checksum, 'version': document.get('version'),
-        'scope': document.get('scope'), 'cell_count': len(cells),
-        'cell_source_pairs': len(selected),
-        'unique_sources': len({source_id(item['source']) for item in selected}),
+        'source_cells_anger_sha256': document.get('source_sha256'),
+        'scope': document.get('scope'), **counts,
         'pre_selection_images': len(dataset['items']),
+        'random_fallback': False, 'allowed_emotions': ['anger'],
+        'allowed_targets': sorted({item['metadata']['target_au'] for item in selected}),
     }
     return {**dataset, 'items': selected, 'metadata': metadata,
             'kind': f"{dataset['kind']}_rare_cells"}

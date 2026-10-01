@@ -48,6 +48,13 @@ evidence hiện có, nên pipeline không lấy thêm ảnh ngẫu nhiên để 
 ghi SHA-256 của `cells_anger.json`; `dataset_inputs.json` và run config lưu SHA
 của chính allowlist đã dùng.
 
+Default config khóa hai checksum: snapshot trong repo và file nguồn
+`_shared/cells_anger.json` đã dùng để tạo snapshot. Nó cũng khóa đúng 5 cells,
+38 pairs và 32 nguồn. Nếu file selection bị sửa, count thay đổi hoặc người chạy
+truyền allowlist khác, CLI dừng trước preprocessing. `scope_audit.json` trong mỗi
+run liệt kê chính xác mọi `(cell_id, source_id, A, x)` và ghi
+`random_fallback=false`; đây là file cần kiểm tra trước khi duyệt run.
+
 `selection_status=prequalified_R1_R8_R10` chỉ nói source/cell đủ điều kiện để
 thử gen. Nó **không** nói ảnh output hợp lệ. Cho tới khi có OpenGraphAU gate
 (1)(2), AUCANet gate (3″) và dlib identity gate (4), output được ghi rõ

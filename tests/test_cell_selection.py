@@ -69,6 +69,22 @@ class CellSelectionTests(unittest.TestCase):
                 with self.subTest(key=key), self.assertRaisesRegex(ValueError, 'not approved'):
                     apply_cell_selection(self.dataset(), path, self.requests())
 
+    def test_pinned_checksums_and_scope_counts_reject_drift(self):
+        expected = 'd5db8048354ea53a2edd7c51caee0befdffc52115ee77a3c23d2b00cbca052da'
+        source = '7ce3342c42d391d9a534ccfda6877eccb246c14822417f3ce82ec8c8495fc741'
+        result = apply_cell_selection(
+            self.dataset(), SELECTION, self.requests(), expected, source,
+            {'cell_count': 5, 'cell_source_pairs': 38, 'unique_sources': 32})
+        audit = result['metadata']['cell_selection']
+        self.assertFalse(audit['random_fallback'])
+        self.assertEqual(audit['allowed_emotions'], ['anger'])
+        self.assertEqual(audit['allowed_targets'], ['AU25', 'AU5'])
+        with self.assertRaisesRegex(ValueError, 'checksum mismatch'):
+            apply_cell_selection(self.dataset(), SELECTION, self.requests(), '0' * 64)
+        with self.assertRaisesRegex(ValueError, 'scope count mismatch'):
+            apply_cell_selection(self.dataset(), SELECTION, self.requests(), expected, source,
+                                 {'cell_count': 6})
+
 
 if __name__ == '__main__':
     unittest.main()

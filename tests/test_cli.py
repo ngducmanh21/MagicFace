@@ -49,6 +49,11 @@ class CliTests(unittest.TestCase):
         self.assertEqual(parsed.min_images, 0)
         self.assertEqual(len(parsed.au_requests), 9)
         self.assertEqual(Path(parsed.cell_selection), ROOT / 'configs/anger_cells_magicface.json')
+        self.assertEqual(parsed.expected_cell_count, 5)
+        self.assertEqual(parsed.expected_cell_source_pairs, 38)
+        self.assertEqual(parsed.expected_unique_sources, 32)
+        self.assertEqual(parsed.shared_source_sha256,
+                         '7ce3342c42d391d9a534ccfda6877eccb246c14822417f3ce82ec8c8495fc741')
         self.assertEqual(sum(all(value == 0 for value in request.values())
                              for request in parsed.au_requests), 1)
         self.assertTrue(all(sum(value != 0 for value in request.values()) <= 1

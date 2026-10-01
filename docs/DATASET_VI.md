@@ -181,6 +181,7 @@ runs/dataset_full/
   results.json                # số đo đầy đủ + metadata từng sample
   dataset_inputs.json         # snapshot danh sách input đã chọn
   cell_selection.json         # snapshot audited rare-cell allowlist nếu dùng
+  scope_audit.json             # checksum, exact allowed pairs, no-random-fallback contract
   dataset_summary.json        # số lượng, trạng thái, thời gian, thông số chạy
   generation_manifest.json    # dùng chấm lại AU mà không sinh lại ảnh
   failures.csv / failures.json

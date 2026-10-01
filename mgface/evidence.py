@@ -242,7 +242,7 @@ def write_evidence(report, output_dir, formats=('png', 'svg', 'pdf')):
     config['figure_formats'] = list(formats)
     (output_dir / 'run_config.json').write_text(json.dumps(config, indent=2), encoding='utf-8')
     artifacts.extend(('summary.json', 'run_config.json'))
-    for optional in ('cell_selection.json', 'dataset_inputs.json'):
+    for optional in ('cell_selection.json', 'scope_audit.json', 'dataset_inputs.json'):
         if (output_dir / optional).is_file():
             artifacts.append(optional)
     # Checksums cover precisely the exported evidence files, not an entire working directory.

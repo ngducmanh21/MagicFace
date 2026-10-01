@@ -216,7 +216,7 @@ def _write_html(report, output_dir):
                         f'{esc(dataset_counts.get("images_with_output", "N/A"))} images with output; '
                         f'{esc(dataset_counts.get("generated_edits", "N/A"))} generated edits; '
                         f'{esc(dataset_counts.get("failed_events", "N/A"))} input/preprocessing/generation failure events.</p>')
-    for name in ('dataset_summary.json', 'dataset_inputs.json', 'cell_selection.json',
+    for name in ('dataset_summary.json', 'dataset_inputs.json', 'cell_selection.json', 'scope_audit.json',
                  'samples.csv', 'failures.csv', 'excluded_annotations.csv'):
         if (output_dir / name).is_file():
             links += f' <a href="{name}">{name}</a>'

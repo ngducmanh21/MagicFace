@@ -12,6 +12,7 @@ rồi bỏ `--inspect` để sinh ảnh và xuất report chung.
 Ví dụ: `python run_magicface.py dataset /data/RAF-DB --dataset-type rafdb --split test --inspect`.
 Config dataset mặc định chỉ chạy 5 rare Anger cells đã audit: 38 cell-source pairs,
 32 nguồn train duy nhất, target AU5/AU25 ở mức +1…+4 cùng zero baseline.
+Selection được khóa SHA-256 và không có random fallback; mỗi run xuất `scope_audit.json`.
 
 > **MagicFace: High-Fidelity Facial Expression Editing with Action-Unit Control** [[arXiv paper](http://arxiv.org/abs/2501.02260)]<br>
 > Mengting Wei, Tuomas Varanka, Xingxun Jiang, Huai-Qian Khor, Guoying Zhao<br>

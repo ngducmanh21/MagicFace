@@ -20,7 +20,9 @@ CONFIG_KEYS = {'image', 'background', 'output_dir', 'aus', 'variations', 'seed',
                'inference_steps', 'title', 'au_python', 'au_backend', 'au_device',
                'au_delta_scale', 'figure_formats', 'base_model', 'id_model', 'denoising_model',
                'limit', 'min_images', 'dataset_type', 'split', 'raf_images',
-               'affectnet_classes', 'single_au_only', 'require_zero_baseline', 'cell_selection'}
+               'affectnet_classes', 'single_au_only', 'require_zero_baseline', 'cell_selection',
+               'cell_selection_sha256', 'shared_source_sha256', 'expected_cell_count',
+               'expected_cell_source_pairs', 'expected_unique_sources'}
 
 
 def resolve_path(value, base):
@@ -177,6 +179,14 @@ def build_command(args):
             if not selection_path.is_absolute():
                 selection_path = base / selection_path
             command += ['--cell_selection', os.path.abspath(os.fspath(selection_path))]
+            for key, flag in (
+                    ('cell_selection_sha256', '--cell_selection_sha256'),
+                    ('shared_source_sha256', '--shared_source_sha256'),
+                    ('expected_cell_count', '--expected_cell_count'),
+                    ('expected_cell_source_pairs', '--expected_cell_source_pairs'),
+                    ('expected_unique_sources', '--expected_unique_sources')):
+                if config.get(key) is not None:
+                    command += [flag, str(config[key])]
         for value, flag in ((args.annotations, '--annotations'), (args.image_root, '--image_root')):
             if value:
                 command += [flag, str(Path(value).expanduser().resolve())]

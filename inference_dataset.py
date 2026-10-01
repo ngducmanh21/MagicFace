@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 from inference import generate_edits, load_pipeline, model_metadata
 from mgface.au import edit_metadata, parse_au_request
-from mgface.cell_selection import apply_cell_selection
+from mgface.cell_selection import apply_cell_selection, source_id
 from mgface.dataset_inputs import discover_dataset, inspect_item, item_key
 from mgface.verification import add_report_arguments, report_from_args, validate_scale
 
@@ -34,7 +34,15 @@ def plan_dataset(args):
                                split=args.split, annotations=args.annotations, image_root=args.image_root,
                                raf_images=args.raf_images, affectnet_classes=args.affectnet_classes)
     if args.cell_selection:
-        dataset = apply_cell_selection(dataset, args.cell_selection, args.au_requests)
+        expected_counts = ({'cell_count': args.expected_cell_count,
+                            'cell_source_pairs': args.expected_cell_source_pairs,
+                            'unique_sources': args.expected_unique_sources}
+                           if args.expected_cell_count is not None else None)
+        dataset = apply_cell_selection(
+            dataset, args.cell_selection, args.au_requests,
+            expected_sha256=args.cell_selection_sha256,
+            expected_source_sha256=args.shared_source_sha256,
+            expected_counts=expected_counts)
     selected = dataset['items'][:args.limit] if args.limit else dataset['items']
     if args.min_images and len(selected) < args.min_images:
         raise ValueError(f'Experiment requires at least {args.min_images} selected images, found {len(selected)}.')
@@ -142,6 +150,17 @@ def execute_dataset(args, loader=load_pipeline, generator=generate_edits,
     if args.cell_selection:
         write_json(output / 'cell_selection.json',
                    json.loads(Path(args.cell_selection).read_text(encoding='utf-8')))
+        write_json(output / 'scope_audit.json', {
+            **dataset['metadata']['cell_selection'],
+            'selected_pairs': [{'cell_id': item['metadata']['cell_id'],
+                                'source_id': source_id(item['source']),
+                                'emotion': item['fer']['source_true'],
+                                'A': item['metadata']['cell_A'],
+                                'target_au': item['metadata']['target_au']}
+                               for item in selected],
+            'generation_policy': 'zero baseline plus target AU levels 1,2,3,4 only',
+            'acceptance_policy': 'outputs remain ungated until gates 1,2,3,4 are evaluated',
+        })
     _csv(output / 'excluded_annotations.csv', dataset.get('excluded_annotations', []),
          ['annotation', 'sample', 'split', 'reason'])
 
@@ -272,6 +291,11 @@ def parse_args(argv=None):
     parser.add_argument('--raf_images', choices=('auto', 'aligned', 'original'), default='auto')
     parser.add_argument('--affectnet_classes', type=int, choices=(7, 8), default=8)
     parser.add_argument('--cell_selection', help='Audited rare-cell allowlist; filters sources before --limit.')
+    parser.add_argument('--cell_selection_sha256')
+    parser.add_argument('--shared_source_sha256')
+    parser.add_argument('--expected_cell_count', type=int)
+    parser.add_argument('--expected_cell_source_pairs', type=int)
+    parser.add_argument('--expected_unique_sources', type=int)
     parser.add_argument('--output_dir', required=True)
     parser.add_argument('--au_test', default='AU4+AU1')
     parser.add_argument('--AU_variation', action='append')
